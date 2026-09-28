@@ -54,23 +54,66 @@ class VoxCPMEngine:
 
         if config.TORCH_THREADS > 0:
             torch.set_num_threads(config.TORCH_THREADS)
-        log.info("carregando %s em %s", config.VOXCPM_MODEL, config.VOXCPM_DEVICE)
+        model_path = self._model_path()
+        log.info("carregando %s em %s", model_path, config.VOXCPM_DEVICE)
         # optimize=False: o torch.compile do VoxCPM usa CUDA graphs ("reduce-overhead"),
         # que em CPU só atrasa a primeira síntese sem ganho.
         self.model = VoxCPM.from_pretrained(
-            config.VOXCPM_MODEL,
+            model_path,
             load_denoiser=False,
             optimize=config.VOXCPM_DEVICE != "cpu",
             device=config.VOXCPM_DEVICE,
         )
         self.sample_rate = self.model.tts_model.sample_rate
 
+    @staticmethod
+    def _model_path() -> str:
+        """Pasta do modelo com o dtype pedido em VOXCPM_DTYPE.
+
+        O VoxCPM2 vem configurado em bfloat16. Em CPU sem instruções bf16
+        (AMX / AVX-512 BF16) essas contas são emuladas: no teste local, float32
+        gerou o áudio 3,6× mais rápido, ao custo do dobro de RAM (~10 GB).
+        O dtype só é lido do config.json, então montamos uma cópia da pasta com
+        hardlinks para os pesos e o config alterado.
+        """
+        import json
+        import os
+
+        from huggingface_hub import snapshot_download
+
+        source = Path(config.VOXCPM_MODEL)
+        if not source.is_dir():
+            source = Path(snapshot_download(config.VOXCPM_MODEL))
+        cfg = json.loads((source / "config.json").read_text(encoding="utf-8"))
+        dtype = config.VOXCPM_DTYPE
+        if dtype == "auto":
+            dtype = "float32" if config.VOXCPM_DEVICE == "cpu" else cfg.get("dtype", "bfloat16")
+        if cfg.get("dtype") == dtype:
+            return str(source)
+
+        target = config.DATA_DIR / "models" / f"{source.name}-{dtype}"
+        target.mkdir(parents=True, exist_ok=True)
+        for f in source.iterdir():
+            dest = target / f.name
+            if f.name == "config.json" or dest.exists():
+                continue
+            try:
+                os.link(f.resolve(), dest)
+            except OSError:
+                os.symlink(f.resolve(), dest)
+        cfg["dtype"] = dtype
+        (target / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+        return str(target)
+
     def synthesize(self, text: str, voice: Voice) -> tuple[np.ndarray, int]:
+        import torch
+
         kwargs = {
             "cfg_value": config.VOXCPM_CFG,
             "inference_timesteps": config.VOXCPM_TIMESTEPS,
-            "seed": voice.seed,
         }
+        # O parâmetro seed= só existe no VoxCPM do GitHub; a versão do PyPI não aceita.
+        torch.manual_seed(voice.seed)
         anchor = self._anchor_path(voice)
         if voice.reference_wav:
             kwargs["reference_wav_path"] = str(voice.reference_wav)

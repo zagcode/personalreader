@@ -27,9 +27,19 @@ Para clonar uma voz, coloque um áudio curto e limpo (5 a 15 segundos) em `data/
 
 ## Requisitos da VPS
 
-O VoxCPM2 tem 2 bilhões de parâmetros e roda em bfloat16 na CPU, o que ocupa uns 5 GB de RAM. Somando o docling e o sistema, conte com pelo menos 8 GB de RAM (16 GB é mais confortável), 4 vCPUs ou mais e uns 20 GB de disco para imagem, modelos e cache.
+O VoxCPM2 tem 2 bilhões de parâmetros. O modelo vem em bfloat16, mas em CPU sem instruções bf16 no hardware essas contas são emuladas. Por isso `VOXCPM_DTYPE=auto` carrega o modelo em float32 quando roda em CPU. O modelo não é baixado de novo: o app monta em `data/.../models/` uma pasta com hardlinks para os mesmos pesos e só o `config.json` alterado.
 
-A velocidade em CPU não foi medida neste projeto. Espere que uma frase leve mais tempo para gerar do que para tocar, e que CPUs com AVX-512 BF16 ou AMX (Xeon Sapphire Rapids ou mais novos, EPYC Zen 4 ou mais novos) sejam bem mais rápidas que as outras. O canto superior direito da página mostra a razão medida no seu servidor, por exemplo "Cada segundo de fala leva ~3 s para gerar". Com uma razão alta, o que ajuda:
+Num PC desktop de 6 núcleos, gerando uma frase curta em inglês:
+
+| dtype | passos | tempo de geração ÷ duração do áudio |
+|---|---|---|
+| bfloat16 | 10 | ~36× |
+| float32 | 10 | ~10× |
+| float32 | 6 | ~7× |
+
+Em float32 o modelo ocupa uns 10 GB de RAM. Então a VPS precisa de 16 GB de RAM, 4 vCPUs ou mais e uns 25 GB de disco. Com só 8 GB de RAM, use `VOXCPM_DTYPE=bfloat16` (uns 5 GB) e aceite a lentidão, a não ser que a CPU tenha AMX (Xeon Sapphire Rapids ou mais novo). Nesse caso o bfloat16 tende a ser o mais rápido dos dois, mas isso não foi medido aqui.
+
+Mesmo no melhor caso, uma frase leva bem mais tempo para gerar do que para tocar, e a pré-carga só compensa em parte. O canto superior direito da página mostra a razão medida no seu servidor, por exemplo "Cada segundo de fala leva ~7 s para gerar". O que ajuda:
 
 - `VOXCPM_TIMESTEPS=6` (o padrão é 10) reduz os passos de difusão, com alguma perda de naturalidade;
 - pausas a cada frase ou a cada 3 frases dão tempo para a fila adiantar o trecho seguinte;
