@@ -26,7 +26,7 @@ TORCH_THREADS = int(os.getenv("TORCH_THREADS", "0"))  # 0 = padrão do torch
 DOCLING_OCR = _bool("DOCLING_OCR", False)
 DOCLING_TABLES = _bool("DOCLING_TABLES", True)
 
-MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "10"))
 MAX_SEGMENT_CHARS = int(os.getenv("MAX_SEGMENT_CHARS", "280"))
 # Quantas frases à frente o servidor aceita gerar a partir da posição pedida.
 MAX_PREFETCH = int(os.getenv("MAX_PREFETCH", "6"))

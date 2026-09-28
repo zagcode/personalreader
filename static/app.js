@@ -34,7 +34,7 @@ const settings = {
   listen: store.get("listen", false),
 };
 
-let cfg = { extensions: [], voices: [], max_upload_mb: 50 };
+let cfg = { extensions: [], voices: [], max_upload_mb: 10 };
 let health = null;
 
 /* ================================================================ rotas */

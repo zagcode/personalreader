@@ -42,12 +42,23 @@ A conversão com docling também é lenta em CPU. Um PDF de 9 páginas com tabel
 ```bash
 git clone https://github.com/zagcode/personalreader.git
 cd personalreader
-cp .env.example .env        # defina APP_PASSWORD
+cp .env.example .env        # defina APP_PASSWORD e as variáveis TRAEFIK_*
 docker compose up -d --build
 docker compose logs -f      # a primeira subida baixa os modelos para ./data/hf
 ```
 
-O container escuta só em `127.0.0.1:8000`. Coloque o nginx na frente usando `deploy/nginx.conf` como base e gere o certificado com `certbot --nginx`. O `proxy_read_timeout` alto desse arquivo é necessário: a rota de áudio só responde quando a frase termina de ser gerada.
+O container não publica porta nenhuma. Ele entra na rede externa do Traefik e é roteado pelas labels do `docker-compose.yml`, que leem quatro variáveis do `.env`:
+
+| Variável | Padrão | O que é |
+|---|---|---|
+| `TRAEFIK_HOST` | (obrigatória) | domínio da página, por exemplo `leitor.seudominio.com` |
+| `TRAEFIK_NETWORK` | `traefik` | rede Docker em que o seu Traefik está |
+| `TRAEFIK_ENTRYPOINT` | `websecure` | entrypoint HTTPS do Traefik |
+| `TRAEFIK_CERTRESOLVER` | `letsencrypt` | nome do certresolver configurado no Traefik |
+
+Confira os nomes reais na configuração do seu Traefik; `docker network ls` mostra a rede. O redirecionamento de HTTP para HTTPS continua sendo do Traefik, como nos outros serviços.
+
+A rota de áudio só responde quando a frase termina de ser gerada, o que em CPU pode levar mais de um minuto numa frase longa. Nos padrões do Traefik isso funciona, porque ele não limita o tempo de resposta do backend (`responseHeaderTimeout` é 0). Se você tiver definido `forwardingTimeouts` ou `respondingTimeouts.writeTimeout` na configuração, deixe folga de alguns minutos. No Traefik v3, `respondingTimeouts.readTimeout` do entrypoint vem em 60 s e vale para receber o upload. Por isso o limite de upload da demo é 10 MB (`MAX_UPLOAD_MB`): com uns 10% de overhead de HTTP e TLS, esse tamanho sobe em menos de 60 s a partir de ~1,5 Mbps de upload, que é o piso de um 4G fraco ou de um ADSL. Em 1 Mbps só caberiam uns 6,5 MB. Se precisar de arquivos maiores, aumente `MAX_UPLOAD_MB` e o `readTimeout` do entrypoint juntos.
 
 Com `APP_PASSWORD` definido, o navegador pede usuário e senha (qualquer usuário, essa senha). Sem senha, qualquer pessoa que achar o endereço consegue enviar arquivos e ocupar a CPU.
 

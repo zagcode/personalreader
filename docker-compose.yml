@@ -3,8 +3,20 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
-    ports:
-      - "127.0.0.1:8000:8000"
     volumes:
       # Modelos (VoxCPM2 + docling), documentos e áudio gerado persistem aqui.
       - ./data:/data
+    networks:
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.personalreader.rule=Host(`${TRAEFIK_HOST:?defina TRAEFIK_HOST no .env}`)
+      - traefik.http.routers.personalreader.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.personalreader.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.personalreader.loadbalancer.server.port=8000
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
