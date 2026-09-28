@@ -6,6 +6,7 @@ Por isso há um worker só, com prioridade: a frase que o player está esperando
 """
 
 import hashlib
+import json
 import heapq
 import itertools
 import logging
@@ -19,7 +20,7 @@ import numpy as np
 import soundfile as sf
 
 from .. import config
-from .voices import Voice
+from .base import TTSEngine, Voice
 
 log = logging.getLogger(__name__)
 
@@ -37,8 +38,9 @@ AUDIO_EXT = _pick_format()
 AUDIO_MIME = {"mp3": "audio/mpeg", "wav": "audio/wav"}[AUDIO_EXT]
 
 
-def cache_key(engine_name: str, voice: Voice, text: str) -> str:
-    raw = "|".join([engine_name, config.VOXCPM_MODEL, voice.id, voice.style, str(voice.seed), text])
+def cache_key(engine: TTSEngine, voice: Voice, text: str) -> str:
+    params = json.dumps(voice.params, sort_keys=True, default=str)
+    raw = "|".join([engine.cache_id(), voice.id, params, text])
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:24]
 
 
@@ -58,7 +60,7 @@ class Job:
 
 
 class TTSQueue:
-    def __init__(self, engine) -> None:
+    def __init__(self, engine: TTSEngine) -> None:
         self.engine = engine
         self._heap: list[tuple[int, int, str]] = []
         self._jobs: dict[str, Job] = {}
@@ -75,7 +77,7 @@ class TTSQueue:
         self._thread.start()
 
     def submit(self, text: str, voice: Voice, doc_id: str, priority: int) -> tuple[str, Future]:
-        key = cache_key(self.engine.name, voice, text)
+        key = cache_key(self.engine, voice, text)
         if audio_path(key).exists():
             done: Future = Future()
             done.set_result(audio_path(key))

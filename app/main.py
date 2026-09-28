@@ -16,12 +16,11 @@ from . import config, converter, storage
 from .segmenter import segment_markdown
 from .tts.engines import create_engine
 from .tts.queue import AUDIO_MIME, PRIORITY_AHEAD, PRIORITY_NOW, TTSQueue
-from .tts.voices import get_voice, list_voices
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("personalreader")
 
-tts = TTSQueue(create_engine())
+tts = TTSQueue(create_engine(config.TTS_ENGINE))
 # Um documento por vez: o docling já ocupa todos os núcleos num PDF grande.
 convert_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="docling")
 
@@ -88,7 +87,7 @@ def client_config():
         "extensions": sorted(converter.allowed_extensions()),
         "max_upload_mb": config.MAX_UPLOAD_MB,
         "max_prefetch": config.MAX_PREFETCH,
-        "voices": [{"id": v.id, "label": v.label} for v in list_voices()],
+        "voices": [{"id": v.id, "label": v.label, "languages": list(v.languages)} for v in tts.engine.voices()],
     }
 
 
@@ -151,11 +150,11 @@ def _segment_text(doc_id: str, index: int) -> str:
 
 
 @app.get("/api/documents/{doc_id}/segments/{index}/audio")
-async def segment_audio(doc_id: str, index: int, voice: str = "natural"):
+async def segment_audio(doc_id: str, index: int, voice: str = ""):
     if tts.load_error:
         raise HTTPException(503, f"Motor de voz indisponível: {tts.load_error}")
     text = _segment_text(doc_id, index)
-    _, future = tts.submit(text, get_voice(voice), doc_id, PRIORITY_NOW)
+    _, future = tts.submit(text, tts.engine.get_voice(voice), doc_id, PRIORITY_NOW)
     try:
         path = await asyncio.wrap_future(future)
     except (CancelledError, asyncio.CancelledError):
@@ -166,7 +165,7 @@ async def segment_audio(doc_id: str, index: int, voice: str = "natural"):
 
 
 class PrefetchRequest(BaseModel):
-    voice: str = "natural"
+    voice: str = ""
     start: int
     end: int  # exclusivo
 
@@ -184,7 +183,7 @@ def prefetch(doc_id: str, req: PrefetchRequest):
     segments = content["segments"]
     start = max(0, req.start)
     end = min(len(segments), req.end, start + config.MAX_PREFETCH)
-    voice = get_voice(req.voice)
+    voice = tts.engine.get_voice(req.voice)
 
     ready = []
     keys = set()

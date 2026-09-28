@@ -21,9 +21,26 @@ Atalhos: espaço toca ou pausa, ← e → mudam de frase, A repete a frase atual
 
 ## Vozes
 
-Há quatro vozes prontas em `app/tts/voices.py`, feitas com o recurso de voice design do VoxCPM2, que cria uma voz a partir de uma descrição em texto. Como uma voz desenhada varia um pouco de timbre de uma frase para outra, a primeira frase gerada com cada voz é salva em `data/app/voices/_anchor_<voz>.wav` e passa a servir de referência para as seguintes. Apague esse arquivo se quiser sortear outro timbre.
+Com o VoxCPM2 há quatro vozes prontas em `app/tts/engines/voxcpm.py`, feitas com o recurso de voice design do VoxCPM2, que cria uma voz a partir de uma descrição em texto. Como uma voz desenhada varia um pouco de timbre de uma frase para outra, a primeira frase gerada com cada voz é salva em `data/app/voices/_anchor_<voz>.wav` e passa a servir de referência para as seguintes. Apague esse arquivo se quiser sortear outro timbre.
 
 Para clonar uma voz, coloque um áudio curto e limpo (5 a 15 segundos) em `data/app/voices/nome.wav`. Se criar também `nome.txt` com a transcrição exata do áudio, o modelo usa o modo de clonagem mais fiel. A voz aparece na lista depois de recarregar a página.
+
+## Trocar o modelo de voz
+
+O VoxCPM2 é um dos motores possíveis. A fila, o cache, a API e o player só conhecem o contrato em `app/tts/base.py`, e cada motor fica num módulo em `app/tts/engines/` com as próprias vozes e opções. Para usar outro modelo:
+
+1. Crie `app/tts/engines/<nome>.py` com uma classe que herda de `TTSEngine` e implementa:
+   - `voices()`: a lista de vozes que o player mostra. Cada `Voice` tem `id`, `label`, os idiomas que fala (`languages`, vazio se o modelo detecta sozinho) e um dicionário `params` livre para o motor.
+   - `synthesize(text, voice)`: devolve a onda mono em float32 e o sample rate.
+   - `load()`: opcional. Carrega o modelo uma vez, antes da primeira frase.
+   - `cache_id()`: opcional. Tudo que muda o áudio além do texto e da voz, como o nome do modelo e a precisão. O cache em disco usa esse valor na chave, então trocar de modelo nunca devolve áudio do anterior.
+2. Registre o nome em `ENGINES` no `app/tts/engines/__init__.py`, ou pule o registro e use o caminho completo: `TTS_ENGINE=app.tts.engines.meu:MeuMotor`.
+3. Leia as opções do motor de variáveis de ambiente com um prefixo próprio, dentro do módulo, como `voxcpm.py` faz com `VOXCPM_*`.
+4. Ponha as dependências no `requirements.txt`. Só o motor escolhido é importado, então as dependências dos outros podem ficar de fora da imagem.
+
+`app/tts/engines/mock.py` é o exemplo mínimo, e `tests/test_engines.py` tem o teste de contrato que um motor novo deve passar.
+
+Um cuidado ao escolher o modelo: o VoxCPM2 descobre o idioma pelo texto, mas a maioria dos TTS rápidos (Kokoro, Piper) tem uma voz por idioma. Com eles você escolhe a voz do idioma do documento no player. Os campos `languages` já existem para o player um dia filtrar as vozes pelo idioma detectado, mas essa detecção ainda não está implementada.
 
 ## Requisitos da VPS
 

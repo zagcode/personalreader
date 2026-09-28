@@ -4,7 +4,8 @@ Leitor TTS para treino de audição. FastAPI + docling (conversão para Markdown
 
 - `app/segmenter.py`: Markdown → blocos → frases (unidade de síntese). Tem testes em `tests/test_segmenter.py`.
 - `app/tts/queue.py`: fila com **um** worker e prioridade (frase tocando > pré-carga). Não paralelizar: em CPU só piora.
-- `app/tts/engines.py`: `VoxCPMEngine` (produção) e `MockEngine` (dev, `TTS_ENGINE=mock`).
+- `app/tts/base.py`: contrato `TTSEngine`/`Voice`. Fila, cache, API e player só conhecem isso; nada fora de `app/tts/engines/` pode importar um motor específico.
+- `app/tts/engines/`: um módulo por motor (`voxcpm.py`, `mock.py`), cada um com suas vozes e opções de ambiente (prefixo próprio). Registro em `engines/__init__.py`; `TTS_ENGINE` aceita nome ou `modulo:Classe`.
 - `static/app.js`: player; pausas de confirmação calculadas em `computeUnits`/`chunkEndFor`.
 - Rodar local: `TTS_ENGINE=mock .venv/Scripts/python -m uvicorn app.main:app --reload`; testes: `.venv/Scripts/python -m pytest`.
 - Deploy: Docker (`docker compose up -d --build`) atrás do Traefik da VPS (labels no `docker-compose.yml`, variáveis `TRAEFIK_*` no `.env`). A rota de áudio segura a resposta até a síntese terminar; não pôr timeout curto no proxy.

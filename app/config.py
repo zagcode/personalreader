@@ -15,15 +15,9 @@ AUDIO_DIR = DATA_DIR / "audio"
 VOICES_DIR = Path(os.getenv("VOICES_DIR", DATA_DIR / "voices"))
 STATIC_DIR = BASE_DIR / "static"
 
-# "voxcpm" em produção; "mock" gera um áudio sintético para desenvolver sem baixar o modelo.
+# Nome registrado em app/tts/engines/__init__.py ("voxcpm", "mock") ou "pacote.modulo:Classe".
+# As opções de cada motor ficam no módulo dele (ex.: VOXCPM_* em app/tts/engines/voxcpm.py).
 TTS_ENGINE = os.getenv("TTS_ENGINE", "voxcpm")
-VOXCPM_MODEL = os.getenv("VOXCPM_MODEL", "openbmb/VoxCPM2")
-VOXCPM_DEVICE = os.getenv("VOXCPM_DEVICE", "cpu")
-# auto = float32 em CPU (mais rápido sem bf16 no hardware, porém ~10 GB de RAM); ou bfloat16 / float32
-VOXCPM_DTYPE = os.getenv("VOXCPM_DTYPE", "auto")
-VOXCPM_TIMESTEPS = int(os.getenv("VOXCPM_TIMESTEPS", "10"))
-VOXCPM_CFG = float(os.getenv("VOXCPM_CFG", "2.0"))
-TORCH_THREADS = int(os.getenv("TORCH_THREADS", "0"))  # 0 = padrão do torch
 
 DOCLING_OCR = _bool("DOCLING_OCR", False)
 DOCLING_TABLES = _bool("DOCLING_TABLES", True)

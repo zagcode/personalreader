@@ -20,10 +20,10 @@ def test_upload_read_and_audio():
         assert doc["status"] == "ready", doc
         assert doc["segments"] == 3
 
-        res = client.post(f"/api/documents/{doc_id}/prefetch", json={"voice": "natural", "start": 0, "end": 99})
+        res = client.post(f"/api/documents/{doc_id}/prefetch", json={"voice": "grave", "start": 0, "end": 99})
         assert res.json()["end"] == 3
 
-        audio = client.get(f"/api/documents/{doc_id}/segments/0/audio?voice=natural")
+        audio = client.get(f"/api/documents/{doc_id}/segments/0/audio?voice=grave")
         assert audio.status_code == 200
         assert audio.headers["content-type"].startswith("audio/")
         assert len(audio.content) > 1000
