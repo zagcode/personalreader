@@ -1,0 +1,9 @@
+# Desenvolvimento local sem o VoxCPM (TTS_ENGINE=mock).
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+soundfile>=0.12
+numpy
+docling>=2.70
+pytest
+httpx

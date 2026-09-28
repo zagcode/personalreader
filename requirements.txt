@@ -1,0 +1,8 @@
+# Instale o torch de CPU ANTES (ver README / Dockerfile), senão o pip baixa a versão CUDA (~2 GB a mais).
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+soundfile>=0.12
+numpy
+docling>=2.70
+voxcpm>=2.0

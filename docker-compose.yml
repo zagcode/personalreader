@@ -1,0 +1,10 @@
+services:
+  personalreader:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Modelos (VoxCPM2 + docling), documentos e áudio gerado persistem aqui.
+      - ./data:/data

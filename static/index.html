@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Personal Reader</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=__BUILD__">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">Personal Reader</a>
+    <span class="engine" id="engine-status" aria-live="polite"></span>
+  </header>
+
+  <!-- Biblioteca / envio -->
+  <main id="home" class="home" hidden>
+    <label class="drop" id="drop">
+      <input type="file" id="file-input">
+      <span class="drop-title">Solte um arquivo aqui para ouvir</span>
+      <span class="drop-hint">ou clique para escolher. <span id="formats"></span></span>
+      <span class="drop-progress" id="upload-status" aria-live="polite"></span>
+    </label>
+
+    <section class="library" aria-labelledby="lib-title">
+      <h2 id="lib-title">Seus textos</h2>
+      <p class="empty" id="lib-empty" hidden>Nenhum texto ainda. O primeiro arquivo que você enviar aparece aqui.</p>
+      <ul id="lib-list"></ul>
+    </section>
+  </main>
+
+  <!-- Leitura -->
+  <main id="reader" class="reader" hidden>
+    <div class="reader-head">
+      <a href="#/" class="back">Voltar aos textos</a>
+      <h1 id="doc-title"></h1>
+    </div>
+    <p class="doc-state" id="doc-state" aria-live="polite"></p>
+    <article id="doc-text" class="doc-text"></article>
+  </main>
+
+  <footer class="player" id="player" hidden>
+    <div class="player-main">
+      <div class="transport">
+        <button type="button" id="btn-prev" title="Frase anterior (←)" aria-label="Frase anterior">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>
+        </button>
+        <button type="button" id="btn-play" class="play" title="Tocar ou pausar (espaço)" aria-label="Tocar">
+          <svg viewBox="0 0 24 24" class="i-play" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>
+          <svg viewBox="0 0 24 24" class="i-pause" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+        <button type="button" id="btn-next" title="Próxima frase (→)" aria-label="Próxima frase">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>
+        </button>
+        <button type="button" id="btn-again" title="Ouvir a frase de novo (A)" aria-label="Ouvir a frase de novo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1L7 6l5 5V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+        </button>
+      </div>
+      <div class="where">
+        <span id="position">—</span>
+        <span id="play-state" class="play-state" aria-live="polite"></span>
+        <div class="buffer" id="buffer" aria-hidden="true"></div>
+      </div>
+      <button type="button" class="settings-toggle" id="btn-settings" aria-expanded="false" aria-controls="settings">Ajustes</button>
+    </div>
+
+    <div class="settings" id="settings" hidden>
+      <label>Voz
+        <select id="opt-voice"></select>
+      </label>
+      <label>Velocidade
+        <select id="opt-rate">
+          <option value="0.7">0,7×</option>
+          <option value="0.85">0,85×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.15">1,15×</option>
+          <option value="1.3">1,3×</option>
+        </select>
+      </label>
+      <label>Parar para confirmar
+        <select id="opt-pause">
+          <option value="paragraph" selected>ao fim de cada parágrafo</option>
+          <option value="1">a cada frase</option>
+          <option value="3">a cada 3 frases</option>
+          <option value="6">a cada 6 frases</option>
+        </select>
+      </label>
+      <label>Repetir cada frase
+        <select id="opt-repeat">
+          <option value="1" selected>não repetir</option>
+          <option value="2">2 vezes</option>
+          <option value="3">3 vezes</option>
+        </select>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="opt-listen">
+        <span>Modo escuta: esconder a frase até terminar de ouvir</span>
+      </label>
+    </div>
+  </footer>
+
+  <template id="checkpoint-tpl">
+    <div class="checkpoint" role="group" aria-label="Pausa para confirmar">
+      <p>Pausa. Entendeu este trecho?</p>
+      <div class="checkpoint-actions">
+        <button type="button" class="primary" data-act="continue">Continuar leitura</button>
+        <button type="button" data-act="replay">Ouvir o trecho de novo</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="/static/app.js?v=__BUILD__"></script>
+</body>
+</html>
