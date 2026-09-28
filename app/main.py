@@ -87,7 +87,10 @@ def client_config():
         "extensions": sorted(converter.allowed_extensions()),
         "max_upload_mb": config.MAX_UPLOAD_MB,
         "max_prefetch": config.MAX_PREFETCH,
-        "voices": [{"id": v.id, "label": v.label, "languages": list(v.languages)} for v in tts.engine.voices()],
+        "voices": [
+            {"id": v.id, "label": v.label, "group": v.group, "languages": list(v.languages)}
+            for v in tts.engine.voices()
+        ],
     }
 
 

@@ -630,7 +630,20 @@ function reveal() {
 
 function setupSettings() {
   const voice = $("#opt-voice");
-  voice.replaceChildren(...cfg.voices.map((v) => new Option(v.label, v.id)));
+  // Vozes com grupo (idioma) viram <optgroup>; a ordem vem do servidor.
+  const groups = new Map();
+  for (const v of cfg.voices) {
+    if (!groups.has(v.group)) groups.set(v.group, []);
+    groups.get(v.group).push(new Option(v.label, v.id));
+  }
+  voice.replaceChildren(...[...groups].flatMap(([group, options]) => {
+    if (!group) return options;
+    const og = document.createElement("optgroup");
+    og.label = group;
+    og.append(...options);
+    return [og];
+  }));
+  $("#voice-hint").hidden = groups.size < 2;
   if (!cfg.voices.some((v) => v.id === settings.voice)) settings.voice = cfg.voices[0]?.id || "natural";
   voice.value = settings.voice;
   $("#opt-rate").value = String(settings.rate);

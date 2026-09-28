@@ -1,0 +1,3 @@
+# Só para TTS_ENGINE=voxcpm. Instale torchaudio pelo índice de CPU antes:
+#   pip install torchaudio --index-url https://download.pytorch.org/whl/cpu
+voxcpm>=2.0

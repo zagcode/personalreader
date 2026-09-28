@@ -17,6 +17,8 @@ class Voice:
     label: str
     # Códigos ISO 639-1 que a voz fala. Vazio = qualquer idioma (o modelo detecta pelo texto).
     languages: tuple[str, ...] = ()
+    # Agrupamento no seletor do player (ex.: "Português (Brasil)"). Vazio = sem grupo.
+    group: str = ""
     # Parâmetros próprios do motor (descrição de estilo, semente, arquivo de referência...).
     # Entram na chave do cache: mudar um deles gera áudio novo.
     params: dict = field(default_factory=dict)

@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      # Modelos (VoxCPM2 + docling), documentos e áudio gerado persistem aqui.
+      # Modelos (Kokoro/VoxCPM2 e docling), documentos e áudio gerado persistem aqui.
       - ./data:/data
     networks:
       - traefik

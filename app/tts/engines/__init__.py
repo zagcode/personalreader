@@ -12,6 +12,7 @@ from ..base import TTSEngine
 
 ENGINES = {
     "mock": "app.tts.engines.mock:MockEngine",
+    "kokoro": "app.tts.engines.kokoro:KokoroEngine",
     "voxcpm": "app.tts.engines.voxcpm:VoxCPMEngine",
 }
 

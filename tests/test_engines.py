@@ -52,3 +52,18 @@ def test_cache_key_changes_with_engine_voice_params_and_text():
     assert base != cache_key(_Fixed("outro-modelo"), voice, "texto")
     assert base != cache_key(_Fixed(), Voice("a", "A", params={"seed": 2}), "texto")
     assert base != cache_key(_Fixed(), voice, "outro texto")
+
+
+def test_kokoro_voices_are_grouped_by_language(tmp_path, monkeypatch):
+    import numpy as np
+
+    from app.tts.engines import kokoro
+
+    voices_file = tmp_path / "voices.bin"
+    np.savez(voices_file, pm_alex=np.zeros(1), af_heart=np.zeros(1), af_bella=np.zeros(1), xx_bad=np.zeros(1))
+    voices = kokoro.KokoroEngine._read_voices(voices_file.with_suffix(".bin.npz"))
+    assert [v.id for v in voices] == ["af_heart", "af_bella", "pm_alex"]
+    alex = voices[-1]
+    assert alex.group == "Português (Brasil)" and alex.languages == ("pt",)
+    assert alex.params == {"voice": "pm_alex", "lang": "pt-br", "g2p": "espeak"}
+    assert alex.label == "Alex (masculina)"

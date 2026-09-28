@@ -5,5 +5,8 @@ python-multipart>=0.0.9
 soundfile>=0.12
 numpy
 docling>=2.70
+kokoro-onnx>=0.6
+# Fonemas com tom para as vozes em chinês (o espeak perde os tons)
+misaki[zh]>=0.9
 pytest
 httpx

@@ -242,7 +242,8 @@ button.primary { background: var(--ink); color: var(--paper); }
 .play .i-pause, .play .spinner { display: none; }
 .player.playing .play .i-play { display: none; }
 .player.playing .play .i-pause { display: block; }
-.player.loading .play svg { display: none; }
+.player.loading .play .i-play,
+.player.loading .play .i-pause { display: none; }
 .player.loading .play .spinner { display: block; }
 .spinner {
   width: 1.4rem;
@@ -275,13 +276,14 @@ button.primary { background: var(--ink); color: var(--paper); }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
   gap: 0.9rem 1.5rem;
+  align-items: start;
   max-width: 60rem;
   margin: 0.9rem auto 0.25rem;
   padding-top: 0.9rem;
   border-top: 1px solid var(--rule);
   font-size: 0.9375rem;
 }
-.settings label { display: grid; gap: 0.3rem; color: var(--steel); }
+.settings label { display: grid; gap: 0.3rem; align-content: start; color: var(--steel); }
 .settings select {
   width: 100%;
   padding: 0.45rem 0.5rem;
@@ -290,6 +292,7 @@ button.primary { background: var(--ink); color: var(--paper); }
   border-radius: 4px;
   color: var(--ink);
 }
+.settings .hint { font-size: 0.8125rem; }
 .settings .check { display: flex; align-items: flex-start; gap: 0.5rem; color: var(--ink); grid-column: 1 / -1; }
 .settings .check input { width: 1.1rem; height: 1.1rem; margin-top: 0.15rem; accent-color: var(--ink); }
 
