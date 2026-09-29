@@ -21,6 +21,8 @@ TTS_ENGINE = os.getenv("TTS_ENGINE", "kokoro")
 
 DOCLING_OCR = _bool("DOCLING_OCR", False)
 DOCLING_TABLES = _bool("DOCLING_TABLES", True)
+# PDFs são convertidos neste tanto de páginas por vez, para a página mostrar o progresso.
+DOCLING_PAGES_PER_STEP = max(1, int(os.getenv("DOCLING_PAGES_PER_STEP", "4")))
 
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "10"))
 MAX_SEGMENT_CHARS = int(os.getenv("MAX_SEGMENT_CHARS", "280"))

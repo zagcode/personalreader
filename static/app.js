@@ -78,7 +78,14 @@ async function loadLibrary() {
     a.append(name, meta);
 
     if (doc.status === "processing") {
-      meta.textContent = "Convertendo o arquivo…";
+      meta.textContent = conversionText(doc);
+      const pct = conversionPct(doc);
+      if (pct !== null) {
+        const meter = document.createElement("span");
+        meter.className = "meter";
+        meter.innerHTML = `<span style="width:${pct}%"></span>`;
+        a.append(meter);
+      }
     } else if (doc.status === "error") {
       meta.textContent = doc.error;
       meta.classList.add("bad");
@@ -107,7 +114,20 @@ async function loadLibrary() {
     list.append(li);
   }
 
-  if (docs.some((d) => d.status === "processing")) libTimer = setTimeout(loadLibrary, 3000);
+  if (docs.some((d) => d.status === "processing")) libTimer = setTimeout(loadLibrary, 1500);
+}
+
+/* Só PDFs têm progresso por página; os outros formatos convertem em segundos. */
+function conversionPct(doc) {
+  const p = doc.progress;
+  return p && p.total ? Math.round((p.done / p.total) * 100) : null;
+}
+
+function conversionText(doc) {
+  const pct = conversionPct(doc);
+  if (pct === null) return "Convertendo o arquivo…";
+  const { done, total } = doc.progress;
+  return `Convertendo o arquivo… ${pct}% (${done} de ${total} páginas)`;
 }
 
 function setupUpload() {
@@ -195,6 +215,7 @@ async function openDoc(id) {
   $("#reader").hidden = false;
   $("#doc-text").replaceChildren();
   $("#doc-title").textContent = "";
+  $("#convert-meter").hidden = true;
   R.id = id;
   const token = ++R.openToken;
 
@@ -208,8 +229,7 @@ async function openDoc(id) {
   document.title = `${doc.name} · Personal Reader`;
 
   if (doc.status === "processing") {
-    setDocState("Convertendo o arquivo para texto. PDFs longos podem levar alguns minutos no servidor.");
-    R.pollTimer = setTimeout(() => R.id === id && openDoc(id), 2500);
+    showConversion(id, doc);
     return;
   }
   if (doc.status === "error") {
@@ -226,6 +246,24 @@ async function openDoc(id) {
   $("#player").hidden = false;
   selectSegment(R.index, { scroll: true });
   updatePlayer();
+}
+
+/* Acompanha a conversão sem recarregar a tela: só o texto e a barra mudam. */
+function showConversion(id, doc) {
+  const pct = conversionPct(doc);
+  const text = conversionText(doc);
+  setDocState(`${text}${text.endsWith("…") ? "" : "."} PDFs longos podem levar alguns minutos no servidor.`);
+  const meter = $("#convert-meter");
+  meter.hidden = pct === null;
+  if (pct !== null) meter.firstElementChild.style.width = `${pct}%`;
+  R.pollTimer = setTimeout(async () => {
+    if (R.id !== id) return;
+    let next;
+    try { next = await api(`/api/documents/${id}`); } catch { next = doc; }
+    if (R.id !== id) return;
+    if (next.status === "processing") showConversion(id, next);
+    else openDoc(id);
+  }, 1500);
 }
 
 function setDocState(text, bad = false) {

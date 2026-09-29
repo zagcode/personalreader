@@ -55,17 +55,31 @@ async def basic_auth(request: Request, call_next):
     return await call_next(request)
 
 
+class _Deleted(Exception):
+    """O documento foi apagado enquanto convertia."""
+
+
 def _convert(doc_id: str, path: Path) -> None:
     meta = storage.load_meta(doc_id)
     if meta is None:
         return
+
+    def progress(done: int, total: int) -> None:
+        if not storage.doc_dir(doc_id):
+            raise _Deleted  # para de converter um documento que não existe mais
+        meta["progress"] = {"done": done, "total": total}
+        storage.save_meta(meta)
+
     try:
-        markdown = converter.to_markdown(path)
+        markdown = converter.to_markdown(path, progress)
         content = segment_markdown(markdown)
         if not content["segments"]:
             raise ValueError("Nenhum texto legível encontrado no arquivo.")
         storage.save_content(doc_id, markdown, content)
         meta.update(status="ready", segments=len(content["segments"]))
+    except _Deleted:
+        log.info("conversão de %s interrompida: documento apagado", path.name)
+        return
     except Exception as exc:  # noqa: BLE001 - mostrado ao usuário
         log.exception("falha ao converter %s", path.name)
         meta.update(status="error", error=str(exc) or type(exc).__name__)

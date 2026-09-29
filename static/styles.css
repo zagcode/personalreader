@@ -123,7 +123,8 @@ button, select, input { font: inherit; color: inherit; }
 .doc-meta { display: block; font-size: 0.875rem; color: var(--steel); }
 .doc-meta.bad { color: var(--danger); }
 .meter { display: block; height: 3px; margin-top: 0.4rem; background: var(--rule); border-radius: 2px; }
-.meter > span { display: block; height: 100%; background: var(--ink); border-radius: 2px; }
+.meter > span { display: block; height: 100%; background: var(--ink); border-radius: 2px; transition: width 0.4s; }
+.convert-meter { height: 6px; max-width: 24rem; margin-top: 0.75rem; }
 .remove {
   background: none;
   border: 0;
