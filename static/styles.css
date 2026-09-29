@@ -265,13 +265,28 @@ button.primary { background: var(--ink); color: var(--paper); }
 .buffer i.now { background: var(--marker); }
 
 .settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   border: 1px solid var(--rule);
   background: none;
   border-radius: 999px;
-  padding: 0.45rem 0.9rem;
+  padding: 0.45rem 0.7rem 0.45rem 0.9rem;
   cursor: pointer;
 }
 .settings-toggle[aria-expanded="true"] { border-color: var(--ink); }
+/* Seta de abrir/recolher: para baixo fechado, gira para cima aberto. */
+.settings-toggle .chevron {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+.settings-toggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
 
 .settings {
   display: grid;
@@ -308,6 +323,6 @@ button.primary { background: var(--ink); color: var(--paper); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .s, .s.current { transition: none; }
+  .s, .s.current, .settings-toggle .chevron { transition: none; }
   .spinner { animation-duration: 2.4s; }
 }

@@ -764,11 +764,18 @@ function setupSettings() {
     refreshVeil();
   });
 
-  $("#btn-settings").addEventListener("click", (e) => {
-    const panel = $("#settings");
-    panel.hidden = !panel.hidden;
-    e.currentTarget.setAttribute("aria-expanded", String(!panel.hidden));
+  $("#btn-settings").addEventListener("click", () => toggleSettings());
+  // Esc recolhe os ajustes e devolve o foco ao botão.
+  $("#player").addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || $("#settings").hidden) return;
+    toggleSettings(false);
+    $("#btn-settings").focus();
   });
+}
+
+function toggleSettings(open = $("#settings").hidden) {
+  $("#settings").hidden = !open;
+  $("#btn-settings").setAttribute("aria-expanded", String(open));
 }
 
 /* ================================================================ status do motor */
