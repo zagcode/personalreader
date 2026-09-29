@@ -666,7 +666,8 @@ function reveal() {
 
 /* ================================================================ ajustes */
 
-function setupSettings() {
+/* Monta o seletor de voz; roda de novo se as vozes chegarem depois (motor ainda baixando). */
+function populateVoices() {
   const voice = $("#opt-voice");
   // Vozes com grupo (idioma) viram <optgroup>; a ordem vem do servidor.
   const groups = new Map();
@@ -682,8 +683,13 @@ function setupSettings() {
     return [og];
   }));
   $("#voice-hint").hidden = groups.size < 2;
-  if (!cfg.voices.some((v) => v.id === settings.voice)) settings.voice = cfg.voices[0]?.id || "natural";
+  if (!cfg.voices.some((v) => v.id === settings.voice)) settings.voice = cfg.voices[0]?.id || "";
   voice.value = settings.voice;
+}
+
+function setupSettings() {
+  const voice = $("#opt-voice");
+  populateVoices();
   $("#opt-rate").value = String(settings.rate);
   $("#opt-pause").value = String(settings.pause);
   $("#opt-repeat").value = String(settings.repeat);
@@ -730,6 +736,10 @@ async function pollHealth() {
   const el = $("#engine-status");
   try {
     health = await api("/api/health");
+    if (health.ready && !cfg.voices.length) {
+      cfg = await api("/api/config");
+      populateVoices();
+    }
     el.classList.toggle("bad", Boolean(health.error));
     if (health.error) el.textContent = "Voz indisponível no servidor";
     else if (!health.ready) el.textContent = "Carregando o modelo de voz…";

@@ -156,6 +156,13 @@ def delete_document(doc_id: str):
         raise HTTPException(404, "Documento não encontrado.")
 
 
+def _voice(voice_id: str):
+    try:
+        return tts.engine.get_voice(voice_id)
+    except LookupError as exc:
+        raise HTTPException(503, f"Vozes ainda indisponíveis: {tts.load_error or exc}") from exc
+
+
 def _segment_text(doc_id: str, index: int) -> str:
     content = storage.load_content(doc_id)
     if content is None:
@@ -171,7 +178,7 @@ async def segment_audio(doc_id: str, index: int, voice: str = ""):
     if tts.load_error:
         raise HTTPException(503, f"Motor de voz indisponível: {tts.load_error}")
     text = _segment_text(doc_id, index)
-    _, future = tts.submit(text, tts.engine.get_voice(voice), doc_id, PRIORITY_NOW)
+    _, future = tts.submit(text, _voice(voice), doc_id, PRIORITY_NOW)
     try:
         path = await asyncio.wrap_future(future)
     except (CancelledError, asyncio.CancelledError):
@@ -200,7 +207,7 @@ def prefetch(doc_id: str, req: PrefetchRequest):
     segments = content["segments"]
     start = max(0, req.start)
     end = min(len(segments), req.end, start + config.MAX_PREFETCH)
-    voice = tts.engine.get_voice(req.voice)
+    voice = _voice(req.voice)
 
     ready = []
     keys = set()

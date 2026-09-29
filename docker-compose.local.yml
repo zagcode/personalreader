@@ -1,0 +1,11 @@
+# Rodar a imagem na máquina local, sem Traefik:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+# Publica em http://localhost:8000 e tira a rede e as labels do Traefik.
+services:
+  personalreader:
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks: !reset []
+    labels: !reset []
+
+networks: !reset {}

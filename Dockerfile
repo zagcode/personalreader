@@ -17,6 +17,12 @@ RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/c
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
+# Modelos do docling (layout e tabelas) dentro da imagem: a conversão não depende
+# da internet na hora do upload. Com DOCLING_OCR=true o modelo de OCR ainda é
+# baixado na primeira conversão.
+ENV DOCLING_ARTIFACTS_PATH=/opt/docling-models
+RUN docling-tools models download -o "$DOCLING_ARTIFACTS_PATH" layout tableformer
+
 COPY app ./app
 COPY static ./static
 

@@ -67,3 +67,32 @@ def test_kokoro_voices_are_grouped_by_language(tmp_path, monkeypatch):
     assert alex.group == "Português (Brasil)" and alex.languages == ("pt",)
     assert alex.params == {"voice": "pm_alex", "lang": "pt-br", "g2p": "espeak"}
     assert alex.label == "Alex (masculina)"
+
+
+def test_kokoro_download_retries_then_succeeds(tmp_path, monkeypatch):
+    from app.tts.engines import kokoro
+
+    calls = []
+
+    def flaky(url, dest):
+        calls.append(url)
+        if len(calls) < 3:
+            raise OSError("No address associated with hostname")
+        dest.write_bytes(b"ok")
+
+    monkeypatch.setattr(kokoro.urllib.request, "urlretrieve", flaky)
+    monkeypatch.setattr(kokoro.time, "sleep", lambda s: None)
+    target = kokoro._ensure(tmp_path / "voices.bin")
+    assert target.read_bytes() == b"ok" and len(calls) == 3
+
+
+def test_kokoro_download_gives_up(tmp_path, monkeypatch):
+    from app.tts.engines import kokoro
+
+    def offline(url, dest):
+        raise OSError("offline")
+
+    monkeypatch.setattr(kokoro.urllib.request, "urlretrieve", offline)
+    monkeypatch.setattr(kokoro.time, "sleep", lambda s: None)
+    with pytest.raises(RuntimeError):
+        kokoro._ensure(tmp_path / "voices.bin")

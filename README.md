@@ -65,7 +65,15 @@ docker compose up -d --build
 docker compose logs -f      # a primeira subida baixa os modelos para ./data
 ```
 
-O container não publica porta nenhuma. Ele entra na rede externa do Traefik e é roteado pelas labels do `docker-compose.yml`, que leem quatro variáveis do `.env`:
+Os modelos do docling (layout e tabelas) vão dentro da imagem, baixados no build, então a conversão não depende da internet na hora do upload. Os arquivos do Kokoro são baixados na primeira subida para `./data`, com até 5 tentativas se a rede falhar. Se todas falharem, o app sobe mesmo assim, mostra o erro em `/api/health` e tenta de novo ao carregar o modelo.
+
+Para testar a imagem na sua máquina, sem Traefik, use o override local. Ele publica a página em http://localhost:8000:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
+Na VPS o container não publica porta nenhuma. Ele entra na rede externa do Traefik e é roteado pelas labels do `docker-compose.yml`, que leem quatro variáveis do `.env`:
 
 | Variável | Padrão | O que é |
 |---|---|---|

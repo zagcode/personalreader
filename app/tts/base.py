@@ -48,4 +48,6 @@ class TTSEngine(ABC):
 
     def get_voice(self, voice_id: str) -> Voice:
         voices = self.voices()
+        if not voices:
+            raise LookupError("o motor de voz ainda não tem vozes disponíveis")
         return next((v for v in voices if v.id == voice_id), voices[0])

@@ -19,6 +19,7 @@ Opções (variáveis de ambiente, lidas só quando este motor é o escolhido):
 
 import logging
 import os
+import time
 import urllib.request
 from pathlib import Path
 
@@ -53,6 +54,7 @@ GENDERS = {"f": "feminina", "m": "masculina"}
 MISAKI = {"z": ("zh", "ZHG2P"), "j": ("ja", "JAG2P")}
 # Voz padrão: a de melhor avaliação no VOICES.md do Kokoro.
 DEFAULT_VOICE = "af_heart"
+DOWNLOAD_ATTEMPTS = 5  # esperas de 2, 4, 8 e 16 s entre as tentativas
 
 
 def _path(name: str) -> Path:
@@ -65,9 +67,17 @@ def _ensure(path: Path) -> Path:
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
     url = f"{DOWNLOAD_URL}/{path.name}"
-    log.info("baixando %s", url)
     tmp = path.with_suffix(path.suffix + ".part")
-    urllib.request.urlretrieve(url, tmp)
+    # Logo depois que o container sobe o DNS às vezes ainda não responde.
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        log.info("baixando %s (tentativa %d)", url, attempt)
+        try:
+            urllib.request.urlretrieve(url, tmp)
+            break
+        except OSError as exc:
+            if attempt == DOWNLOAD_ATTEMPTS:
+                raise RuntimeError(f"não foi possível baixar {url}: {exc}") from exc
+            time.sleep(2**attempt)
     tmp.replace(path)
     return path
 
@@ -89,12 +99,23 @@ class KokoroEngine(TTSEngine):
         self._g2p = {prefix: cls for prefix, (mod, name) in MISAKI.items() if (cls := _misaki(mod, name))}
         self._g2p_ready: dict = {}
         # O arquivo de vozes é pequeno e é ele que define a lista do player,
-        # então é lido já na inicialização, antes do modelo carregar.
-        self._voices = self._read_voices(_ensure(_path(VOICES_FILE)), skip=set(MISAKI) - set(self._g2p))
+        # então é lido já na inicialização, antes do modelo carregar. Se o
+        # download falhar aqui, o app sobe mesmo assim e load() tenta de novo
+        # (a falha aparece em /api/health em vez de derrubar o processo).
+        self._voices: list[Voice] = []
+        try:
+            self._voices = self._load_voices()
+        except Exception:  # noqa: BLE001
+            log.exception("vozes do Kokoro indisponíveis na inicialização; nova tentativa ao carregar o modelo")
+
+    def _load_voices(self) -> list[Voice]:
+        return self._read_voices(_ensure(_path(VOICES_FILE)), skip=set(MISAKI) - set(self._g2p))
 
     def load(self) -> None:
         from kokoro_onnx import Kokoro
 
+        if not self._voices:
+            self._voices = self._load_voices()
         model_path = _ensure(_path(MODEL_FILE))
         log.info("carregando %s", model_path)
         self.model = Kokoro(str(model_path), str(_path(VOICES_FILE)))
