@@ -1,4 +1,4 @@
-# Desenvolvimento local sem o VoxCPM (TTS_ENGINE=mock).
+# Desenvolvimento local e testes (TTS_ENGINE=mock dispensa baixar o modelo de voz).
 fastapi>=0.115
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9

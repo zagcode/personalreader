@@ -12,11 +12,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
 DOCS_DIR = DATA_DIR / "docs"
 AUDIO_DIR = DATA_DIR / "audio"
-VOICES_DIR = Path(os.getenv("VOICES_DIR", DATA_DIR / "voices"))
 STATIC_DIR = BASE_DIR / "static"
 
-# Nome registrado em app/tts/engines/__init__.py ("kokoro", "voxcpm", "mock") ou "pacote.modulo:Classe".
-# As opções de cada motor ficam no módulo dele (ex.: VOXCPM_* em app/tts/engines/voxcpm.py).
+# Nome registrado em app/tts/engines/__init__.py ("kokoro", "mock") ou "pacote.modulo:Classe".
+# As opções de cada motor ficam no módulo dele (ex.: KOKORO_* em app/tts/engines/kokoro.py).
 TTS_ENGINE = os.getenv("TTS_ENGINE", "kokoro")
 
 DOCLING_OCR = _bool("DOCLING_OCR", False)
@@ -38,5 +37,5 @@ ALLOWED_EXTENSIONS = {
     ".epub", ".odt", ".png", ".jpg", ".jpeg", ".tiff", ".tif",
 }
 
-for d in (DOCS_DIR, AUDIO_DIR, VOICES_DIR):
+for d in (DOCS_DIR, AUDIO_DIR):
     d.mkdir(parents=True, exist_ok=True)

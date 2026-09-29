@@ -3,7 +3,7 @@
 TTS_ENGINE aceita um nome deste registro ou o caminho de qualquer classe que
 implemente app.tts.base.TTSEngine, no formato "pacote.modulo:Classe".
 O import é feito só do motor escolhido, então as dependências dos outros
-(torch, voxcpm...) não precisam estar instaladas.
+(kokoro-onnx, misaki...) não precisam estar instaladas.
 """
 
 import importlib
@@ -13,7 +13,6 @@ from ..base import TTSEngine
 ENGINES = {
     "mock": "app.tts.engines.mock:MockEngine",
     "kokoro": "app.tts.engines.kokoro:KokoroEngine",
-    "voxcpm": "app.tts.engines.voxcpm:VoxCPMEngine",
 }
 
 

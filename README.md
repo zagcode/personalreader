@@ -1,6 +1,6 @@
 # Personal Reader
 
-Leitor em voz alta para treinar audição em outros idiomas. Você envia um arquivo (PDF, DOCX, EPUB, HTML, PPTX, XLSX, ODT, Markdown ou texto), o [docling](https://github.com/docling-project/docling) converte o conteúdo para Markdown e um modelo de voz lê o texto frase por frase. O modelo padrão é o [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), rodando pelo [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx), que em CPU gera a fala mais rápido do que ela toca. O [VoxCPM2](https://github.com/OpenBMB/VoxCPM) continua disponível como alternativa mais natural e bem mais lenta.
+Leitor em voz alta para treinar audição em outros idiomas. Você envia um arquivo (PDF, DOCX, EPUB, HTML, PPTX, XLSX, ODT, Markdown ou texto), o [docling](https://github.com/docling-project/docling) converte o conteúdo para Markdown e um modelo de voz lê o texto frase por frase. O modelo padrão é o [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), rodando pelo [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx), que em CPU gera a fala mais rápido do que ela toca.
 
 Foi pensado para uma VPS sem GPU. O áudio não é gerado de uma vez: o servidor sintetiza a frase que está tocando e as seguintes até o próximo ponto de confirmação. Ao fim de cada trecho a leitura pausa e pergunta se você quer continuar ou ouvir o trecho de novo. Enquanto a pausa não é respondida, o servidor não gera mais nada além da primeira frase do trecho seguinte, então uma aba esquecida aberta não ocupa a CPU com o livro inteiro.
 
@@ -32,15 +32,9 @@ Os fonemas vêm do espeak-ng, que já vem embutido no kokoro-onnx, com duas exce
 
 Num PC desktop de 6 núcleos, o Kokoro gerou cada frase em 0,4 a 0,7 do tempo que ela leva para tocar, com o processo usando uns 625 MB de RAM antes da primeira conversão com o docling. A versão int8 do modelo (`kokoro-v1.0.int8.onnx`, 114 MB) foi 10 vezes mais lenta que a fp32 nessa CPU, por isso o padrão é a fp32 (326 MB). Os arquivos são baixados sozinhos para `data/app/models/kokoro/` na primeira subida.
 
-## VoxCPM2 como alternativa
-
-Com `TTS_ENGINE=voxcpm` a leitura usa o VoxCPM2. Ele descobre o idioma pelo texto (30 idiomas), cria vozes a partir de uma descrição em texto e clona vozes. A fala é mais natural, mas no mesmo PC cada segundo de áudio levou de 7 a 10 segundos para gerar, e o modelo ocupa uns 10 GB de RAM em float32.
-
-A imagem Docker padrão não inclui o VoxCPM. Para usá-lo, construa com `docker compose build --build-arg WITH_VOXCPM=true`. As vozes dele ficam em `app/tts/engines/voxcpm.py`. Para clonar uma voz, coloque um áudio curto e limpo (5 a 15 segundos) em `data/app/voices/nome.wav`, com a transcrição exata em `nome.txt` se quiser a clonagem mais fiel. As opções `VOXCPM_*` estão comentadas no `.env.example`.
-
 ## Trocar o modelo de voz
 
-A fila, o cache, a API e o player só conhecem o contrato em `app/tts/base.py`. Cada motor fica num módulo em `app/tts/engines/` com as próprias vozes e opções: `kokoro.py`, `voxcpm.py` e `mock.py`. Para usar outro modelo:
+A fila, o cache, a API e o player só conhecem o contrato em `app/tts/base.py`. Cada motor fica num módulo em `app/tts/engines/` com as próprias vozes e opções: `kokoro.py` e `mock.py`, que troca a voz por bipes para testes. Para usar outro modelo:
 
 1. Crie `app/tts/engines/<nome>.py` com uma classe que herda de `TTSEngine` e implementa:
    - `voices()`: a lista de vozes que o player mostra. Cada `Voice` tem `id`, `label`, o grupo em que aparece no seletor (`group`), os idiomas que fala (`languages`) e um dicionário `params` livre para o motor.
@@ -49,7 +43,7 @@ A fila, o cache, a API e o player só conhecem o contrato em `app/tts/base.py`. 
    - `cache_id()`: opcional. Tudo que muda o áudio além do texto e da voz, como o nome do modelo e a precisão. O cache em disco usa esse valor na chave, então trocar de modelo nunca devolve áudio do anterior.
 2. Registre o nome em `ENGINES` no `app/tts/engines/__init__.py`, ou pule o registro e use o caminho completo: `TTS_ENGINE=app.tts.engines.meu:MeuMotor`.
 3. Leia as opções do motor de variáveis de ambiente com um prefixo próprio, dentro do módulo, como `kokoro.py` faz com `KOKORO_*`.
-4. Ponha as dependências no `requirements.txt`, ou num arquivo à parte se forem pesadas, como `requirements-voxcpm.txt`. Só o motor escolhido é importado.
+4. Ponha as dependências no `requirements.txt`. Só o motor escolhido é importado.
 
 `app/tts/engines/mock.py` é o exemplo mínimo, e `tests/test_engines.py` tem o teste de contrato que um motor novo deve passar.
 
@@ -82,7 +76,7 @@ O container não publica porta nenhuma. Ele entra na rede externa do Traefik e �
 
 Confira os nomes reais na configuração do seu Traefik; `docker network ls` mostra a rede. O redirecionamento de HTTP para HTTPS continua sendo do Traefik, como nos outros serviços.
 
-A rota de áudio só responde quando a frase termina de ser gerada. Com o Kokoro isso leva segundos, mas com o VoxCPM pode passar de um minuto numa frase longa. Nos padrões do Traefik os dois casos funcionam, porque ele não limita o tempo de resposta do backend (`responseHeaderTimeout` é 0). Se você tiver definido `forwardingTimeouts` ou `respondingTimeouts.writeTimeout` na configuração, deixe folga de alguns minutos.
+A rota de áudio só responde quando a frase termina de ser gerada. Com o Kokoro isso leva poucos segundos, e nos padrões do Traefik funciona sem ajuste, porque ele não limita o tempo de resposta do backend (`responseHeaderTimeout` é 0). Se você tiver definido `forwardingTimeouts` ou `respondingTimeouts.writeTimeout` na configuração, deixe pelo menos um minuto de folga para frases longas numa CPU mais fraca.
 
 No Traefik v3, `respondingTimeouts.readTimeout` do entrypoint vem em 60 s e vale para receber o upload. Por isso o limite de upload da demo é 10 MB (`MAX_UPLOAD_MB`): com uns 10% de overhead de HTTP e TLS, esse tamanho sobe em menos de 60 s a partir de ~1,5 Mbps de upload, que é o piso de um 4G fraco ou de um ADSL. Em 1 Mbps só caberiam uns 6,5 MB. Se precisar de arquivos maiores, aumente `MAX_UPLOAD_MB` e o `readTimeout` do entrypoint juntos.
 
@@ -98,7 +92,7 @@ python -m venv .venv
 .venv/Scripts/python -m pytest
 ```
 
-Isso já roda com o Kokoro, que baixa os arquivos do modelo (uns 350 MB) na primeira subida. `TTS_ENGINE=mock` troca a voz por bipes e não baixa nada. Para testar o VoxCPM, instale `torchaudio` pelo mesmo índice de CPU, depois `pip install -r requirements-voxcpm.txt`, e rode com `TTS_ENGINE=voxcpm`. O VoxCPM exige Python entre 3.10 e 3.12.
+Isso já roda com o Kokoro, que baixa os arquivos do modelo (uns 350 MB) na primeira subida. `TTS_ENGINE=mock` troca a voz por bipes e não baixa nada.
 
 ## Configuração
 
@@ -119,4 +113,4 @@ Todas as opções estão comentadas em `.env.example`. As que mais importam na p
 
 ## Licenças
 
-docling e kokoro-onnx usam a licença MIT. O modelo Kokoro-82M e o VoxCPM usam Apache 2.0.
+docling e kokoro-onnx usam a licença MIT, e o modelo Kokoro-82M, Apache 2.0.
