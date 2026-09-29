@@ -29,7 +29,7 @@ const store = {
 const settings = {
   voice: store.get("voice", "natural"),
   rate: store.get("rate", 1),
-  pause: store.get("pause", "paragraph"),
+  pause: store.get("pause", "5"),
   repeat: store.get("repeat", 1),
   listen: store.get("listen", false),
 };
@@ -92,7 +92,8 @@ async function loadLibrary() {
     } else {
       const pos = store.get("pos:" + doc.id, 0);
       const pct = doc.segments ? Math.round((pos / doc.segments) * 100) : 0;
-      meta.textContent = pos ? `${doc.segments} frases, ${pct}% ouvido` : `${doc.segments} frases`;
+      const size = doc.duration ? `~${fmtDuration(doc.duration)}` : `${doc.segments} frases`;
+      meta.textContent = pos ? `${size}, ${pct}% ouvido` : size;
       const meter = document.createElement("span");
       meter.className = "meter";
       meter.innerHTML = `<span style="width:${pct}%"></span>`;
@@ -242,6 +243,8 @@ async function openDoc(id) {
   R.index = Math.min(store.get("pos:" + id, 0), R.total - 1);
   R.heard = new Set(Array.from({ length: R.index }, (_, i) => i));
   R.unitEnd = computeUnits(doc.content);
+  R.startAt = [0];
+  doc.content.segments.forEach((_, i) => R.startAt.push(R.startAt[i] + segSeconds(i)));
   renderText(doc.content);
   $("#player").hidden = false;
   selectSegment(R.index, { scroll: true });
@@ -291,9 +294,29 @@ function computeUnits(content) {
   return unitEnd;
 }
 
+/* Duração estimada da frase (o servidor calcula; documentos antigos não têm o campo). */
+function segSeconds(i) {
+  const seg = R.content.segments[i];
+  return seg.seconds ?? seg.text.length / 16 + 0.25;
+}
+
+/* Tempo entre o início da frase a e o fim da frase b. */
+function spanSeconds(a, b) {
+  return R.startAt[b + 1] - R.startAt[a];
+}
+
+/* A pausa acontece no fim do parágrafo em que o tempo escolhido foi atingido.
+   Um parágrafo enorme não pode segurar a pausa muito além do combinado:
+   passando de 1,5x o tempo, ela vem no fim da frase. */
 function chunkEndFor(start) {
-  if (settings.pause === "paragraph") return R.unitEnd[start];
-  return Math.min(start + Number(settings.pause) - 1, R.total - 1);
+  const limit = Number(settings.pause) * 60;
+  if (!limit) return R.total - 1;
+  for (let i = start; i < R.total; i++) {
+    if (spanSeconds(start, i) < limit) continue;
+    const end = R.unitEnd[i];
+    return spanSeconds(start, end) > limit * 1.5 ? i : end;
+  }
+  return R.total - 1;
 }
 
 function renderText(content) {
@@ -566,8 +589,8 @@ async function requestPrefetch() {
 function renderBuffer() {
   const box = $("#buffer");
   box.replaceChildren();
-  const from = R.chunkStart;
-  const to = Math.min(R.chunkEnd, from + 14);
+  const from = R.index;
+  const to = Math.min(R.index + (cfg.max_prefetch || 6) - 1, R.chunkEnd + 1, R.total - 1);
   if (!R.playing && !R.loading && !R.atCheckpoint) return;
   for (let i = from; i <= to; i++) {
     const tick = document.createElement("i");
@@ -596,6 +619,23 @@ function setLoading(on) {
   }
 }
 
+/* "25 min", "1 h 5 min" */
+function fmtDuration(seconds) {
+  const min = Math.max(1, Math.round(seconds / 60));
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  return min % 60 ? `${h} h ${min % 60} min` : `${h} h`;
+}
+
+/* "4:05", "1:02:30" */
+function fmtClock(seconds) {
+  const s = Math.round(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
 function setPlayState(text) {
   $("#play-state").textContent = text;
 }
@@ -604,7 +644,7 @@ function updatePlayer() {
   const player = $("#player");
   player.classList.toggle("playing", R.playing && !R.loading);
   $("#btn-play").setAttribute("aria-label", R.playing ? "Pausar" : R.atCheckpoint ? "Continuar leitura" : "Tocar");
-  $("#position").textContent = R.total ? `Frase ${R.index + 1} de ${R.total}` : "—";
+  $("#position").textContent = R.total ? `${fmtClock(R.startAt[R.index])} / ${fmtClock(R.startAt[R.total])}` : "—";
   $("#btn-prev").disabled = R.index <= 0;
   $("#btn-next").disabled = R.index >= R.total - 1;
   renderBuffer();
@@ -691,6 +731,7 @@ function setupSettings() {
   const voice = $("#opt-voice");
   populateVoices();
   $("#opt-rate").value = String(settings.rate);
+  if (![...$("#opt-pause").options].some((o) => o.value === String(settings.pause))) settings.pause = "5";
   $("#opt-pause").value = String(settings.pause);
   $("#opt-repeat").value = String(settings.repeat);
   $("#opt-listen").checked = settings.listen;
@@ -740,11 +781,9 @@ async function pollHealth() {
       cfg = await api("/api/config");
       populateVoices();
     }
+    // Só aparece algo aqui quando a voz não vai funcionar.
     el.classList.toggle("bad", Boolean(health.error));
-    if (health.error) el.textContent = "Voz indisponível no servidor";
-    else if (!health.ready) el.textContent = "Carregando o modelo de voz…";
-    else if (health.rtf) el.textContent = `Cada segundo de fala leva ~${health.rtf.toLocaleString("pt-BR")} s para gerar`;
-    else el.textContent = "Voz pronta";
+    el.textContent = health.error ? "Voz indisponível no servidor" : "";
     el.title = health.error || "";
   } catch {
     el.textContent = "Servidor fora do ar";

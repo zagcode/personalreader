@@ -62,3 +62,22 @@ print("não deve ser lido")
     # cada segmento aponta para o bloco dono
     for s in content["segments"]:
         assert s["id"] in content["blocks"][s["block"]]["segments"]
+
+
+def test_estimate_seconds_matches_measured_kokoro_speech():
+    from app.segmenter import estimate_seconds
+
+    # Medidas reais do Kokoro: 12,1 s (inglês, 202 caracteres) e 8,4 s (chinês, 41 caracteres).
+    en = (
+        "Once when I was six years old I saw a magnificent picture in a book, called True Stories "
+        "from Nature, about the primeval forest. It was a picture of a boa constrictor in the act of "
+        "swallowing an animal."
+    )
+    zh = "我六岁的时候，在一本描写原始森林的名叫《真实的故事》的书中，看到了一幅精彩的插画。"
+    assert abs(estimate_seconds(en) - 12.1) < 1.5
+    assert abs(estimate_seconds(zh) - 8.4) < 1.5
+
+
+def test_segments_carry_estimated_seconds():
+    content = segment_markdown("Uma frase razoavelmente longa para o teste. Outra frase do mesmo parágrafo.")
+    assert all(s["seconds"] > 0 for s in content["segments"])

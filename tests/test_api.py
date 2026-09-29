@@ -19,6 +19,7 @@ def test_upload_read_and_audio():
             time.sleep(0.1)
         assert doc["status"] == "ready", doc
         assert doc["segments"] == 3
+        assert doc["duration"] > 0
 
         res = client.post(f"/api/documents/{doc_id}/prefetch", json={"voice": "grave", "start": 0, "end": 99})
         assert res.json()["end"] == 3

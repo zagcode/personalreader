@@ -32,6 +32,25 @@ _RE_LIST = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 _RE_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 _RE_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}")
 
+# Velocidade de fala para estimar a duração antes de o áudio existir.
+# Medido com o Kokoro: 14-17 caracteres/s em inglês, português, espanhol,
+# francês e italiano; ~13 em hindi; ~4,7 em chinês (um caractere por sílaba).
+_CHARS_PER_SECOND = 16.0
+_RE_SYLLABIC = re.compile("[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")  # kana e ideogramas
+_SYLLABLES_PER_SECOND = 4.7
+_RE_DEVANAGARI = re.compile("[\u0900-\u097f]")
+_DEVANAGARI_PER_SECOND = 13.0
+# Intervalo que o player deixa entre uma frase e a seguinte.
+GAP_SECONDS = 0.25
+
+
+def estimate_seconds(text: str) -> float:
+    syllabic = len(_RE_SYLLABIC.findall(text))
+    devanagari = len(_RE_DEVANAGARI.findall(text))
+    rest = len(text) - syllabic - devanagari
+    speech = rest / _CHARS_PER_SECOND + syllabic / _SYLLABLES_PER_SECOND + devanagari / _DEVANAGARI_PER_SECOND
+    return round(speech + GAP_SECONDS, 2)
+
 
 def clean_inline(text: str) -> str:
     text = _RE_COMMENT.sub("", text)
@@ -104,7 +123,7 @@ def segment_markdown(markdown: str) -> dict:
     """Retorna {"blocks": [...], "segments": [...]}.
 
     blocks: {"type", "level"?, "segments": [índices]} ou {"type": "table", "rows": [...]}
-    segments: {"id", "block", "text"}
+    segments: {"id", "block", "text", "seconds"} (seconds = duração estimada da fala)
     """
     blocks: list[dict] = []
     segments: list[dict] = []
@@ -117,7 +136,9 @@ def segment_markdown(markdown: str) -> dict:
         block = {"type": kind, **extra, "segments": []}
         for piece in pieces:
             block["segments"].append(len(segments))
-            segments.append({"id": len(segments), "block": len(blocks), "text": piece})
+            segments.append(
+                {"id": len(segments), "block": len(blocks), "text": piece, "seconds": estimate_seconds(piece)}
+            )
         blocks.append(block)
 
     lines = markdown.replace("\r\n", "\n").split("\n")

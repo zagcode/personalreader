@@ -76,7 +76,12 @@ def _convert(doc_id: str, path: Path) -> None:
         if not content["segments"]:
             raise ValueError("Nenhum texto legível encontrado no arquivo.")
         storage.save_content(doc_id, markdown, content)
-        meta.update(status="ready", segments=len(content["segments"]))
+        meta.update(
+            status="ready",
+            segments=len(content["segments"]),
+            # duração estimada do texto lido, em segundos (mostrada em minutos na página)
+            duration=round(sum(seg["seconds"] for seg in content["segments"])),
+        )
     except _Deleted:
         log.info("conversão de %s interrompida: documento apagado", path.name)
         return

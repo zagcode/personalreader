@@ -13,7 +13,9 @@ Foi pensado para uma VPS sem GPU. O áudio não é gerado de uma vez: o servidor
 
 ## Na tela de leitura
 
-A pausa para confirmar pode acontecer ao fim de cada parágrafo (o padrão), a cada frase, a cada 3 ou a cada 6 frases. Um título conta junto com o parágrafo que vem depois dele, e uma lista inteira conta como um trecho só.
+A leitura para e pede confirmação a cada 2, 5 (o padrão), 10, 15 ou 30 minutos, ou não para. A pausa acontece no fim do parágrafo em que o tempo foi atingido, para não cortar um raciocínio no meio; um título conta junto com o parágrafo seguinte, e uma lista inteira conta como um parágrafo só. Se um parágrafo passar de 1,5 vez o tempo escolhido, a pausa vem no fim da frase.
+
+Os tempos são estimados pelo tamanho do texto, porque o áudio só existe depois de gerado. A estimativa usa a velocidade medida do Kokoro: 16 caracteres por segundo nos idiomas de alfabeto latino, 13 em hindi e 4,7 em chinês. Nos testes ela ficou a menos de 1 segundo do áudio real numa frase de 8 a 12 segundos. A lista de textos mostra a duração de cada um ("~28 min"), e o player mostra a posição no mesmo formato de tempo ("4:12 / 27:56").
 
 Em Ajustes você também escolhe a voz, a velocidade (de 0,7× a 1,3×, sem mudar o tom), quantas vezes cada frase se repete e o modo escuta, que desfoca cada frase até você terminar de ouvi-la.
 
