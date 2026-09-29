@@ -1,6 +1,21 @@
+# Ambiente Python local
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Dados do app: documentos, áudio gerado e modelos baixados (local e Docker)
 data/
+*.part
+
+# Configuração com senhas; o modelo versionado é o .env.example
 .env
+.env.*
+!.env.example
+
+# Logs, editores e sistema
+*.log
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
