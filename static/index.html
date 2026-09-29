@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="build" content="__BUILD__">
   <title>Personal Reader</title>
   <meta name="color-scheme" content="light dark">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,21 +14,24 @@
 <body>
   <header class="topbar">
     <a class="brand" href="#/">Personal Reader</a>
-    <span class="engine" id="engine-status" aria-live="polite"></span>
+    <div class="topbar-end">
+      <span class="engine" id="engine-status" aria-live="polite"></span>
+      <select id="ui-lang" class="ui-lang" data-i18n-label="lang.label"></select>
+    </div>
   </header>
 
   <!-- Biblioteca / envio -->
   <main id="home" class="home" hidden>
     <label class="drop" id="drop">
       <input type="file" id="file-input">
-      <span class="drop-title">Solte um arquivo aqui para ouvir</span>
-      <span class="drop-hint">ou clique para escolher. <span id="formats"></span></span>
+      <span class="drop-title" data-i18n="drop.title"></span>
+      <span class="drop-hint"><span data-i18n="drop.hint"></span> <span id="formats"></span></span>
       <span class="drop-progress" id="upload-status" aria-live="polite"></span>
     </label>
 
     <section class="library" aria-labelledby="lib-title">
-      <h2 id="lib-title">Seus textos</h2>
-      <p class="empty" id="lib-empty" hidden>Nenhum texto ainda. O primeiro arquivo que você enviar aparece aqui.</p>
+      <h2 id="lib-title" data-i18n="library.title"></h2>
+      <p class="empty" id="lib-empty" data-i18n="library.empty" hidden></p>
       <ul id="lib-list"></ul>
     </section>
   </main>
@@ -35,7 +39,7 @@
   <!-- Leitura -->
   <main id="reader" class="reader" hidden>
     <div class="reader-head">
-      <a href="#/" class="back">Voltar aos textos</a>
+      <a href="#/" class="back" data-i18n="reader.back"></a>
       <h1 id="doc-title"></h1>
     </div>
     <p class="doc-state" id="doc-state" aria-live="polite"></p>
@@ -46,18 +50,18 @@
   <footer class="player" id="player" hidden>
     <div class="player-main">
       <div class="transport">
-        <button type="button" id="btn-prev" title="Frase anterior (←)" aria-label="Frase anterior">
+        <button type="button" id="btn-prev" data-i18n-label="player.prev" data-shortcut="←">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>
         </button>
-        <button type="button" id="btn-play" class="play" title="Tocar ou pausar (espaço)" aria-label="Tocar">
+        <button type="button" id="btn-play" class="play" data-i18n-label="player.play">
           <svg viewBox="0 0 24 24" class="i-play" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>
           <svg viewBox="0 0 24 24" class="i-pause" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
           <span class="spinner" aria-hidden="true"></span>
         </button>
-        <button type="button" id="btn-next" title="Próxima frase (→)" aria-label="Próxima frase">
+        <button type="button" id="btn-next" data-i18n-label="player.next" data-shortcut="→">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>
         </button>
-        <button type="button" id="btn-again" title="Ouvir a frase de novo (A)" aria-label="Ouvir a frase de novo">
+        <button type="button" id="btn-again" data-i18n-label="player.again" data-shortcut="A">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1L7 6l5 5V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
         </button>
       </div>
@@ -67,59 +71,43 @@
         <div class="buffer" id="buffer" aria-hidden="true"></div>
       </div>
       <button type="button" class="settings-toggle" id="btn-settings" aria-expanded="false" aria-controls="settings">
-        Ajustes
+        <span data-i18n="settings.toggle"></span>
         <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
 
     <div class="settings" id="settings" hidden>
-      <label>Voz
+      <label><span data-i18n="settings.voice"></span>
         <select id="opt-voice"></select>
-        <span class="hint" id="voice-hint" hidden>Cada voz lê no próprio idioma. Escolha uma do idioma do texto.</span>
+        <span class="hint" id="voice-hint" data-i18n="settings.voiceHint" hidden></span>
       </label>
-      <label>Velocidade
-        <select id="opt-rate">
-          <option value="0.7">0,7×</option>
-          <option value="0.85">0,85×</option>
-          <option value="1" selected>1×</option>
-          <option value="1.15">1,15×</option>
-          <option value="1.3">1,3×</option>
-        </select>
+      <label><span data-i18n="settings.speed"></span>
+        <select id="opt-rate"></select>
       </label>
-      <label>Parar para confirmar
-        <select id="opt-pause">
-          <option value="2">a cada 2 minutos</option>
-          <option value="5" selected>a cada 5 minutos</option>
-          <option value="10">a cada 10 minutos</option>
-          <option value="15">a cada 15 minutos</option>
-          <option value="30">a cada 30 minutos</option>
-          <option value="0">não parar</option>
-        </select>
+      <label><span data-i18n="settings.pause"></span>
+        <select id="opt-pause"></select>
       </label>
-      <label>Repetir cada frase
-        <select id="opt-repeat">
-          <option value="1" selected>não repetir</option>
-          <option value="2">2 vezes</option>
-          <option value="3">3 vezes</option>
-        </select>
+      <label><span data-i18n="settings.repeat"></span>
+        <select id="opt-repeat"></select>
       </label>
       <label class="check">
         <input type="checkbox" id="opt-listen">
-        <span>Modo escuta: esconder a frase até terminar de ouvir</span>
+        <span data-i18n="settings.listen"></span>
       </label>
     </div>
   </footer>
 
   <template id="checkpoint-tpl">
-    <div class="checkpoint" role="group" aria-label="Pausa para confirmar">
-      <p>Pausa. Entendeu este trecho?</p>
+    <div class="checkpoint" role="group" data-i18n-label="checkpoint.label">
+      <p data-i18n="checkpoint.question"></p>
       <div class="checkpoint-actions">
-        <button type="button" class="primary" data-act="continue">Continuar leitura</button>
-        <button type="button" data-act="replay">Ouvir o trecho de novo</button>
+        <button type="button" class="primary" data-act="continue" data-i18n="player.continue"></button>
+        <button type="button" data-act="replay" data-i18n="checkpoint.replay"></button>
       </div>
     </div>
   </template>
 
+  <script src="/static/i18n.js?v=__BUILD__"></script>
   <script src="/static/app.js?v=__BUILD__"></script>
 </body>
 </html>

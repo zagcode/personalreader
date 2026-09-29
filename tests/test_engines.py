@@ -64,9 +64,9 @@ def test_kokoro_voices_are_grouped_by_language(tmp_path, monkeypatch):
     voices = kokoro.KokoroEngine._read_voices(voices_file.with_suffix(".bin.npz"))
     assert [v.id for v in voices] == ["af_heart", "af_bella", "pm_alex"]
     alex = voices[-1]
-    assert alex.group == "Português (Brasil)" and alex.languages == ("pt",)
+    assert alex.group == "pt-BR" and alex.languages == ("pt",) and alex.gender == "m"
     assert alex.params == {"voice": "pm_alex", "lang": "pt-br", "g2p": "espeak"}
-    assert alex.label == "Alex (masculina)"
+    assert alex.label == "Alex"
 
 
 def test_kokoro_download_retries_then_succeeds(tmp_path, monkeypatch):

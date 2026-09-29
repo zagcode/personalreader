@@ -45,7 +45,10 @@ def test_upload_read_and_audio(client):
     assert len(audio.content) > 1000
 
     assert client.get(f"/api/documents/{doc_id}/segments/9/audio").status_code == 404
-    assert client.post("/api/documents", files={"file": ("x.exe", b"MZ")}).status_code == 415
+    bad = client.post("/api/documents", files={"file": ("x.exe", b"MZ")})
+    assert bad.status_code == 415
+    # Erros saem como código + parâmetros; a página traduz.
+    assert bad.json()["detail"] == {"code": "unsupported_format", "params": {"ext": ".exe"}}
     assert client.delete(f"/api/documents/{doc_id}").status_code == 204
     assert client.get("/api/documents/..%2F..%2Fetc").status_code == 404
 

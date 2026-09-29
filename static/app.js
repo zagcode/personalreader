@@ -4,14 +4,17 @@ const $ = (s, el = document) => el.querySelector(s);
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
-  if (!res.ok) {
-    let msg = "";
-    try { msg = (await res.json()).detail; } catch { /* corpo sem JSON */ }
-    const err = new Error(msg || `Erro ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
+  if (!res.ok) throw await responseError(res);
   return res.status === 204 ? null : res.json();
+}
+
+/* Transforma a resposta de erro ({detail: {code, params}}) numa Error com texto traduzido. */
+async function responseError(res) {
+  let detail = null;
+  try { detail = (await res.json()).detail; } catch { /* corpo sem JSON */ }
+  const err = new Error(errorText(detail, res.status));
+  err.status = res.status;
+  return err;
 }
 
 const store = {
@@ -27,7 +30,7 @@ const store = {
 };
 
 const settings = {
-  voice: store.get("voice", "natural"),
+  voice: store.get("voice", ""),
   rate: store.get("rate", 1),
   pause: store.get("pause", "5"),
   repeat: store.get("repeat", 1),
@@ -87,13 +90,13 @@ async function loadLibrary() {
         a.append(meter);
       }
     } else if (doc.status === "error") {
-      meta.textContent = doc.error;
+      meta.textContent = errorText(doc.error);
       meta.classList.add("bad");
     } else {
       const pos = store.get("pos:" + doc.id, 0);
       const pct = doc.segments ? Math.round((pos / doc.segments) * 100) : 0;
-      const size = doc.duration ? `~${fmtDuration(doc.duration)}` : `${doc.segments} frases`;
-      meta.textContent = pos ? `${size}, ${pct}% ouvido` : size;
+      const size = doc.duration ? `~${fmtDuration(doc.duration)}` : t("library.sentences", { n: doc.segments });
+      meta.textContent = pos ? t("library.heard", { size, pct }) : size;
       const meter = document.createElement("span");
       meter.className = "meter";
       meter.innerHTML = `<span style="width:${pct}%"></span>`;
@@ -103,10 +106,10 @@ async function loadLibrary() {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "remove";
-    remove.textContent = "Apagar";
-    remove.setAttribute("aria-label", `Apagar ${doc.name}`);
+    remove.textContent = t("library.delete");
+    remove.setAttribute("aria-label", t("library.deleteLabel", { name: doc.name }));
     remove.addEventListener("click", async () => {
-      if (!confirm(`Apagar “${doc.name}” e o áudio gerado dele?`)) return;
+      if (!confirm(t("library.deleteConfirm", { name: doc.name }))) return;
       await api(`/api/documents/${doc.id}`, { method: "DELETE" }).catch(() => {});
       loadLibrary();
     });
@@ -126,9 +129,9 @@ function conversionPct(doc) {
 
 function conversionText(doc) {
   const pct = conversionPct(doc);
-  if (pct === null) return "Convertendo o arquivo…";
+  if (pct === null) return t("convert.running");
   const { done, total } = doc.progress;
-  return `Convertendo o arquivo… ${pct}% (${done} de ${total} páginas)`;
+  return t("convert.progress", { pct, done, total });
 }
 
 function setupUpload() {
@@ -150,16 +153,16 @@ async function upload(file) {
   status.classList.remove("bad");
   const ext = "." + file.name.split(".").pop().toLowerCase();
   if (!cfg.extensions.includes(ext)) {
-    status.textContent = `${file.name}: formato não suportado. Use ${cfg.extensions.join(", ")}.`;
+    status.textContent = t("upload.unsupported", { name: file.name, formats: cfg.extensions.join(", ") });
     status.classList.add("bad");
     return;
   }
   if (file.size > cfg.max_upload_mb * 1024 * 1024) {
-    status.textContent = `${file.name} passa do limite de ${cfg.max_upload_mb} MB.`;
+    status.textContent = t("upload.tooLarge", { name: file.name, mb: cfg.max_upload_mb });
     status.classList.add("bad");
     return;
   }
-  status.textContent = `Enviando ${file.name}…`;
+  status.textContent = t("upload.sending", { name: file.name });
   const form = new FormData();
   form.append("file", file);
   try {
@@ -168,7 +171,7 @@ async function upload(file) {
     $("#file-input").value = "";
     location.hash = `#/doc/${doc.id}`;
   } catch (err) {
-    status.textContent = `Não foi possível enviar ${file.name}: ${err.message}`;
+    status.textContent = t("upload.failed", { name: file.name, reason: err.message });
     status.classList.add("bad");
   }
 }
@@ -222,7 +225,7 @@ async function openDoc(id) {
 
   let doc;
   try { doc = await api(`/api/documents/${id}`); } catch (err) {
-    setDocState(err.status === 404 ? "Este texto não existe mais." : err.message, true);
+    setDocState(err.status === 404 ? t("reader.missing") : err.message, true);
     return;
   }
   if (token !== R.openToken) return;
@@ -234,7 +237,7 @@ async function openDoc(id) {
     return;
   }
   if (doc.status === "error") {
-    setDocState(`A conversão falhou: ${doc.error}`, true);
+    setDocState(t("convert.failed", { reason: errorText(doc.error) }), true);
     return;
   }
   setDocState("");
@@ -255,7 +258,7 @@ async function openDoc(id) {
 function showConversion(id, doc) {
   const pct = conversionPct(doc);
   const text = conversionText(doc);
-  setDocState(`${text}${text.endsWith("…") ? "" : "."} PDFs longos podem levar alguns minutos no servidor.`);
+  setDocState(`${text}${text.endsWith("…") ? "" : "."} ${t("convert.slowNote")}`);
   const meter = $("#convert-meter");
   meter.hidden = pct === null;
   if (pct !== null) meter.firstElementChild.style.width = `${pct}%`;
@@ -401,11 +404,7 @@ function getAudio(i) {
   const url = `/api/documents/${R.id}/segments/${i}/audio?voice=${encodeURIComponent(settings.voice)}`;
   entry = { controller, url: null };
   entry.promise = fetch(url, { signal: controller.signal }).then(async (res) => {
-    if (!res.ok) {
-      let msg = "";
-      try { msg = (await res.json()).detail; } catch { /* sem JSON */ }
-      throw new Error(msg || `Erro ${res.status}`);
-    }
+    if (!res.ok) throw await responseError(res);
     entry.url = URL.createObjectURL(await res.blob());
     return entry.url;
   });
@@ -468,7 +467,7 @@ async function playCurrent() {
     if (err.name === "AbortError" || i !== R.index) return;
     setLoading(false);
     R.playing = false;
-    setPlayState(`Não foi possível gerar esta frase: ${err.message}`);
+    setPlayState(t("player.genFailed", { reason: err.message }));
     updatePlayer();
     return;
   }
@@ -506,7 +505,7 @@ audio.addEventListener("ended", () => {
   markHeard(R.index);
   if (R.index >= R.total - 1) {
     stopPlayback();
-    setPlayState("Fim do texto.");
+    setPlayState(t("player.end"));
     updatePlayer();
     return;
   }
@@ -523,7 +522,7 @@ audio.addEventListener("ended", () => {
 audio.addEventListener("error", () => {
   if (!R.playing) return;
   R.playing = false;
-  setPlayState("O navegador não conseguiu tocar este áudio.");
+  setPlayState(t("player.cantPlay"));
   updatePlayer();
 });
 
@@ -537,6 +536,7 @@ function showCheckpoint() {
   const anchor = span.closest("ul, p, blockquote, h2, h3, h4");
   const node = $("#checkpoint-tpl").content.firstElementChild.cloneNode(true);
   node.id = "checkpoint";
+  applyI18n(node);
   node.addEventListener("click", (e) => {
     const act = e.target.closest("button")?.dataset.act;
     if (act === "continue") continueReading();
@@ -545,7 +545,7 @@ function showCheckpoint() {
   anchor.after(node);
   $("button.primary", node).focus({ preventScroll: true });
   node.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  setPlayState("Pausado para você confirmar.");
+  setPlayState(t("player.waiting"));
   updatePlayer();
   if ("vibrate" in navigator) navigator.vibrate?.(60);
 }
@@ -610,7 +610,7 @@ function setLoading(on) {
     const started = Date.now();
     const tick = () => {
       const s = Math.round((Date.now() - started) / 1000);
-      setPlayState(s < 2 ? "Gerando a voz desta frase…" : `Gerando a voz desta frase… ${s} s`);
+      setPlayState(s < 2 ? t("player.generating") : t("player.generatingSecs", { s }));
     };
     tick();
     R.loadTimer = setInterval(tick, 1000);
@@ -643,7 +643,9 @@ function setPlayState(text) {
 function updatePlayer() {
   const player = $("#player");
   player.classList.toggle("playing", R.playing && !R.loading);
-  $("#btn-play").setAttribute("aria-label", R.playing ? "Pausar" : R.atCheckpoint ? "Continuar leitura" : "Tocar");
+  const play = $("#btn-play");
+  play.setAttribute("aria-label", t(R.playing ? "player.pause" : R.atCheckpoint ? "player.continue" : "player.play"));
+  play.title = `${t("player.playPause")} (${t("player.spaceKey")})`;
   $("#position").textContent = R.total ? `${fmtClock(R.startAt[R.index])} / ${fmtClock(R.startAt[R.total])}` : "—";
   $("#btn-prev").disabled = R.index <= 0;
   $("#btn-next").disabled = R.index >= R.total - 1;
@@ -713,12 +715,13 @@ function populateVoices() {
   const groups = new Map();
   for (const v of cfg.voices) {
     if (!groups.has(v.group)) groups.set(v.group, []);
-    groups.get(v.group).push(new Option(v.label, v.id));
+    const label = v.gender ? `${v.label} (${t(`voice.gender.${v.gender}`)})` : v.label;
+    groups.get(v.group).push(new Option(label, v.id));
   }
   voice.replaceChildren(...[...groups].flatMap(([group, options]) => {
     if (!group) return options;
     const og = document.createElement("optgroup");
-    og.label = group;
+    og.label = languageName(group);
     og.append(...options);
     return [og];
   }));
@@ -727,13 +730,25 @@ function populateVoices() {
   voice.value = settings.voice;
 }
 
+/* Opções de velocidade, pausa e repetição no idioma e no formato de número atuais. */
+function populateOptions() {
+  const fill = (sel, items, value) => {
+    const el = $(sel);
+    el.replaceChildren(...items.map(([v, label]) => new Option(label, String(v))));
+    el.value = String(value);
+  };
+  fill("#opt-rate", [0.7, 0.85, 1, 1.15, 1.3].map((r) => [r, `${fmtNumber(r)}×`]), settings.rate);
+  if (![2, 5, 10, 15, 30, 0].includes(Number(settings.pause))) settings.pause = "5";
+  fill("#opt-pause", [2, 5, 10, 15, 30].map((n) => [n, t("settings.pauseEvery", { n })])
+    .concat([[0, t("settings.pauseNever")]]), settings.pause);
+  fill("#opt-repeat", [[1, t("settings.repeatNone")], [2, t("settings.repeatTimes", { n: 2 })],
+    [3, t("settings.repeatTimes", { n: 3 })]], settings.repeat);
+}
+
 function setupSettings() {
   const voice = $("#opt-voice");
   populateVoices();
-  $("#opt-rate").value = String(settings.rate);
-  if (![...$("#opt-pause").options].some((o) => o.value === String(settings.pause))) settings.pause = "5";
-  $("#opt-pause").value = String(settings.pause);
-  $("#opt-repeat").value = String(settings.repeat);
+  populateOptions();
   $("#opt-listen").checked = settings.listen;
 
   voice.addEventListener("change", () => {
@@ -780,23 +795,30 @@ function toggleSettings(open = $("#settings").hidden) {
 
 /* ================================================================ status do motor */
 
+let serverDown = false;
+
 async function pollHealth() {
-  const el = $("#engine-status");
   try {
     health = await api("/api/health");
+    serverDown = false;
     if (health.ready && !cfg.voices.length) {
       cfg = await api("/api/config");
       populateVoices();
     }
-    // Só aparece algo aqui quando a voz não vai funcionar.
-    el.classList.toggle("bad", Boolean(health.error));
-    el.textContent = health.error ? "Voz indisponível no servidor" : "";
-    el.title = health.error || "";
   } catch {
-    el.textContent = "Servidor fora do ar";
-    el.classList.add("bad");
+    serverDown = true;
   }
+  renderHealth();
   setTimeout(pollHealth, health && !health.ready && !health.error ? 3000 : 15000);
+}
+
+/* Só aparece algo no canto quando a voz não vai funcionar. */
+function renderHealth() {
+  const el = $("#engine-status");
+  const error = serverDown ? t("status.serverDown") : health?.error ? t("status.voiceDown") : "";
+  el.textContent = error;
+  el.classList.toggle("bad", Boolean(error));
+  el.title = (!serverDown && health?.error) || "";
 }
 
 /* ================================================================ entrada */
@@ -831,9 +853,39 @@ function setupControls() {
   }
 }
 
+/* Seletor de idioma da interface: troca os textos sem recarregar a página. */
+function setupLanguage() {
+  const sel = $("#ui-lang");
+  sel.replaceChildren(...Object.entries(I18N.locales).map(([code, name]) => new Option(name, code)));
+  sel.value = I18N.current;
+  sel.addEventListener("change", async () => {
+    await loadLocale(sel.value);
+    store.set("lang", I18N.current);
+    renderLanguage();
+  });
+}
+
+/* Reaplica tudo que depende do idioma na tela atual. */
+function renderLanguage() {
+  applyI18n();
+  $("#formats").textContent = t("drop.formats", { formats: cfg.extensions.join(", "), mb: cfg.max_upload_mb });
+  populateVoices();
+  populateOptions();
+  if (!$("#home").hidden) loadLibrary();
+  if (!$("#reader").hidden) {
+    if (R.content) updatePlayer();
+    else if (R.id) openDoc(R.id); // estado de conversão ou erro: remonta a mensagem
+  }
+  renderHealth();
+}
+
 async function init() {
+  // Português é o padrão; a escolha feita no seletor fica salva no navegador.
+  await loadLocale(store.get("lang", I18N.fallback)).catch(() => {});
   try { cfg = await api("/api/config"); } catch { /* segue com o padrão */ }
-  $("#formats").textContent = `Aceita ${cfg.extensions.join(", ")}, até ${cfg.max_upload_mb} MB.`;
+  setupLanguage();
+  applyI18n();
+  $("#formats").textContent = t("drop.formats", { formats: cfg.extensions.join(", "), mb: cfg.max_upload_mb });
   setupUpload();
   setupSettings();
   setupControls();

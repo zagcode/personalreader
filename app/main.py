@@ -22,6 +22,16 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("personalreader")
 
 tts = TTSQueue(create_engine(config.TTS_ENGINE))
+
+
+def api_error(status: int, code: str, **params) -> HTTPException:
+    """Erro da API como código + parâmetros; o texto fica nos arquivos de tradução da página."""
+    return HTTPException(status, detail={"code": code, "params": params})
+
+
+def doc_error(code: str, **params) -> dict:
+    """Erro de conversão guardado no meta do documento, no mesmo formato dos erros da API."""
+    return {"code": code, "params": params}
 # Um documento por vez: o docling já ocupa todos os núcleos num PDF grande.
 convert_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="docling")
 
@@ -30,7 +40,7 @@ convert_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="docling")
 async def lifespan(_: FastAPI):
     for meta in storage.list_all():
         if meta["status"] == "processing":
-            meta.update(status="error", error="Conversão interrompida (o servidor reiniciou). Envie o arquivo de novo.")
+            meta.update(status="error", error=doc_error("interrupted"))
             storage.save_meta(meta)
     if config.LEGACY_AUDIO_DIR.is_dir():
         # Antes o áudio ficava numa pasta comum e não era apagado junto com o documento.
@@ -64,6 +74,10 @@ class _Deleted(Exception):
     """O documento foi apagado enquanto convertia."""
 
 
+class _NoText(Exception):
+    """A conversão terminou sem nenhuma frase para ler."""
+
+
 def _convert(doc_id: str, path: Path) -> None:
     meta = storage.load_meta(doc_id)
     if meta is None:
@@ -79,7 +93,7 @@ def _convert(doc_id: str, path: Path) -> None:
         markdown = converter.to_markdown(path, progress)
         content = segment_markdown(markdown)
         if not content["segments"]:
-            raise ValueError("Nenhum texto legível encontrado no arquivo.")
+            raise _NoText
         storage.save_content(doc_id, markdown, content)
         meta.update(
             status="ready",
@@ -90,9 +104,11 @@ def _convert(doc_id: str, path: Path) -> None:
     except _Deleted:
         log.info("conversão de %s interrompida: documento apagado", path.name)
         return
+    except _NoText:
+        meta.update(status="error", error=doc_error("no_text"))
     except Exception as exc:  # noqa: BLE001 - mostrado ao usuário
         log.exception("falha ao converter %s", path.name)
-        meta.update(status="error", error=str(exc) or type(exc).__name__)
+        meta.update(status="error", error=doc_error("convert_failed", reason=str(exc) or type(exc).__name__))
     if storage.doc_dir(doc_id):  # pode ter sido apagado durante a conversão
         storage.save_meta(meta)
 
@@ -112,7 +128,7 @@ def client_config():
         "max_upload_mb": config.MAX_UPLOAD_MB,
         "max_prefetch": config.MAX_PREFETCH,
         "voices": [
-            {"id": v.id, "label": v.label, "group": v.group, "languages": list(v.languages)}
+            {"id": v.id, "label": v.label, "group": v.group, "gender": v.gender, "languages": list(v.languages)}
             for v in tts.engine.voices()
         ],
     }
@@ -128,7 +144,7 @@ async def upload(file: UploadFile):
     name = Path(file.filename or "documento").name
     ext = Path(name).suffix.lower()
     if ext not in converter.allowed_extensions():
-        raise HTTPException(415, f"Formato {ext or '(sem extensão)'} não suportado.")
+        raise api_error(415, "unsupported_format", ext=ext)
 
     doc_id = storage.new_id()
     limit = config.MAX_UPLOAD_MB * 1024 * 1024
@@ -141,7 +157,7 @@ async def upload(file: UploadFile):
             if size > limit:
                 out.close()
                 storage.delete(doc_id)
-                raise HTTPException(413, f"Arquivo maior que {config.MAX_UPLOAD_MB} MB.")
+                raise api_error(413, "file_too_large", mb=config.MAX_UPLOAD_MB)
             out.write(chunk)
 
     meta = storage.create(doc_id, name, size)
@@ -153,7 +169,7 @@ async def upload(file: UploadFile):
 def document(doc_id: str):
     meta = storage.load_meta(doc_id)
     if meta is None:
-        raise HTTPException(404, "Documento não encontrado.")
+        raise api_error(404, "doc_not_found")
     if meta["status"] == "ready":
         meta["content"] = storage.load_content(doc_id)
     return meta
@@ -161,42 +177,45 @@ def document(doc_id: str):
 
 @app.delete("/api/documents/{doc_id}", status_code=204)
 def delete_document(doc_id: str):
+    meta = storage.load_meta(doc_id)
     tts.cancel_doc(doc_id)
     if not storage.delete(doc_id):
-        raise HTTPException(404, "Documento não encontrado.")
+        raise api_error(404, "doc_not_found")
+    # Registro de toda exclusão: se um documento sumir, o log diz se foi pela API.
+    log.info("documento apagado pela API: %s (%s)", doc_id, meta and meta.get("name"))
 
 
 def _voice(voice_id: str):
     try:
         return tts.engine.get_voice(voice_id)
     except LookupError as exc:
-        raise HTTPException(503, f"Vozes ainda indisponíveis: {tts.load_error or exc}") from exc
+        raise api_error(503, "voices_not_ready") from exc
 
 
 def _segment_text(doc_id: str, index: int) -> str:
     content = storage.load_content(doc_id)
     if content is None:
-        raise HTTPException(404, "Documento não encontrado ou ainda em processamento.")
+        raise api_error(404, "doc_not_ready")
     segments = content["segments"]
     if not 0 <= index < len(segments):
-        raise HTTPException(404, "Frase fora do documento.")
+        raise api_error(404, "segment_out_of_range")
     return segments[index]["text"]
 
 
 @app.get("/api/documents/{doc_id}/segments/{index}/audio")
 async def segment_audio(doc_id: str, index: int, voice: str = ""):
     if tts.load_error:
-        raise HTTPException(503, f"Motor de voz indisponível: {tts.load_error}")
+        raise api_error(503, "voice_unavailable", reason=tts.load_error)
     text = _segment_text(doc_id, index)
     _, future = tts.submit(text, _voice(voice), doc_id, PRIORITY_NOW)
     try:
         path = await asyncio.wrap_future(future)
     except (CancelledError, asyncio.CancelledError):
-        return JSONResponse({"detail": "Síntese cancelada."}, status_code=409)
+        return JSONResponse({"detail": doc_error("synthesis_cancelled")}, status_code=409)
     except DocumentGone as exc:
-        raise HTTPException(404, "Documento não encontrado.") from exc
+        raise api_error(404, "doc_not_found") from exc
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(500, f"Falha ao gerar o áudio: {exc}") from exc
+        raise api_error(500, "synthesis_failed", reason=str(exc)) from exc
     return FileResponse(path, media_type=AUDIO_MIME, headers={"Cache-Control": "private, max-age=86400"})
 
 
@@ -215,7 +234,7 @@ def prefetch(doc_id: str, req: PrefetchRequest):
     """
     content = storage.load_content(doc_id)
     if content is None:
-        raise HTTPException(404, "Documento não encontrado ou ainda em processamento.")
+        raise api_error(404, "doc_not_ready")
     segments = content["segments"]
     start = max(0, req.start)
     end = min(len(segments), req.end, start + config.MAX_PREFETCH)

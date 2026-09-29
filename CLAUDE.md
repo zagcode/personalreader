@@ -10,4 +10,5 @@ Leitor TTS para treino de audição. FastAPI + docling (conversão para Markdown
 - `static/app.js`: player; pausas de confirmação calculadas em `computeUnits`/`chunkEndFor`.
 - Rodar local: `TTS_ENGINE=mock .venv/Scripts/python -m uvicorn app.main:app --reload`; testes: `.venv/Scripts/python -m pytest`.
 - Deploy: Docker (`docker compose up -d --build`) atrás do Traefik da VPS (labels no `docker-compose.yml`, variáveis `TRAEFIK_*` no `.env`). A rota de áudio segura a resposta até a síntese terminar; não pôr timeout curto no proxy.
+- i18n: textos da página em `static/locales/{pt-BR,en,es}.json` (pt-BR é a referência), carregados por `static/i18n.js`. Nada de texto fixo no HTML/JS: use `data-i18n` ou `t()`. A API devolve só códigos de erro (`api_error`), nunca frases. `tests/test_i18n.py` confere chaves e parâmetros.
 - UI: seguir o sistema visual existente (Literata no texto, Atkinson Hyperlegible Next na UI, marca-texto amarelo como único destaque).

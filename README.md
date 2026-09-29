@@ -21,6 +21,18 @@ Em Ajustes você também escolhe a voz, a velocidade (de 0,7× a 1,3×, sem muda
 
 Atalhos: espaço toca ou pausa, ← e → mudam de frase, A repete a frase atual e R revela a frase no modo escuta. Clicar numa frase começa a leitura por ela. A posição de cada documento e a voz escolhida ficam salvas no navegador.
 
+## Idiomas da interface
+
+A interface está em português (o padrão), inglês e espanhol, escolhidos no seletor do canto superior direito. A escolha fica salva no navegador. Isso muda só os textos da página; o idioma em que o texto é lido depende da voz escolhida em Ajustes.
+
+Os textos ficam em `static/locales/<idioma>.json`, e o português é a referência: uma chave que faltar em outro idioma aparece em português. A API não devolve frases prontas, só códigos de erro com parâmetros (`{"code": "file_too_large", "params": {"mb": 10}}`), que a página traduz com as chaves `error.*`. Os nomes dos idiomas das vozes vêm do próprio navegador (`Intl.DisplayNames`), então não precisam de tradução.
+
+Para acrescentar um idioma:
+
+1. Copie `static/locales/pt-BR.json` para `static/locales/<código>.json` e traduza os valores, mantendo os `{parâmetros}`.
+2. Acrescente o código e o nome do idioma, escrito nele mesmo, em `I18N.locales`, no `static/i18n.js`.
+3. Rode `pytest`: `tests/test_i18n.py` falha se o arquivo novo tiver chaves ou parâmetros diferentes do português.
+
 ## Vozes do Kokoro
 
 O seletor de voz em Ajustes lista todas as vozes do arquivo de vozes do modelo, agrupadas por idioma: inglês americano (20), inglês britânico (8), chinês (8), hindi (4), português do Brasil (3), espanhol (3), italiano (2) e francês (1). A voz padrão é a `af_heart`, a mais bem avaliada na lista do próprio Kokoro.
@@ -120,6 +132,8 @@ Todas as opções estão comentadas em `.env.example`. As que mais importam na p
 | DELETE | `/api/documents/{id}` | apaga o documento |
 | GET | `/api/documents/{id}/segments/{i}/audio?voice=` | áudio da frase `i`, gerado na hora se ainda não existir |
 | POST | `/api/documents/{id}/prefetch` | `{voice, start, end}`: enfileira essa janela e descarta pendências fora dela |
+
+Os erros vêm como `{"detail": {"code": "...", "params": {...}}}`. A lista de códigos está nas chaves `error.*` dos arquivos de tradução.
 
 ## Licenças
 

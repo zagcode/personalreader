@@ -63,7 +63,7 @@ button, select, input { font: inherit; color: inherit; }
 /* ------------------------------------------------------------ topo */
 .topbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   max-width: 60rem;
@@ -77,6 +77,18 @@ button, select, input { font: inherit; color: inherit; }
 }
 .engine { font-size: 0.875rem; color: var(--steel); text-align: right; }
 .engine.bad { color: var(--danger); }
+.topbar-end { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.ui-lang {
+  padding: 0.3rem 0.4rem;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--steel);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.ui-lang:hover { color: var(--ink); border-color: var(--steel); }
+.ui-lang option { color: var(--ink); background: var(--sheet); }
 
 /* ------------------------------------------------------------ biblioteca */
 .home { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }

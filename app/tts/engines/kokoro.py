@@ -37,19 +37,19 @@ DOWNLOAD_URL = os.getenv(
     "KOKORO_DOWNLOAD_URL", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1"
 )
 
-# prefixo -> (código espeak, idioma ISO 639-1, nome no player). A ordem aqui é a ordem no player.
+# prefixo -> (código espeak, idioma ISO 639-1, tag BCP 47 do grupo no player).
+# A página traduz a tag para o nome do idioma. A ordem aqui é a ordem no player.
 LANGUAGES = {
-    "a": ("en-us", "en", "Inglês (EUA)"),
-    "b": ("en-gb", "en", "Inglês (Reino Unido)"),
-    "p": ("pt-br", "pt", "Português (Brasil)"),
-    "e": ("es", "es", "Espanhol"),
-    "f": ("fr-fr", "fr", "Francês"),
-    "i": ("it", "it", "Italiano"),
-    "j": ("ja", "ja", "Japonês"),
-    "z": ("cmn", "zh", "Chinês (mandarim)"),
-    "h": ("hi", "hi", "Hindi"),
+    "a": ("en-us", "en", "en-US"),
+    "b": ("en-gb", "en", "en-GB"),
+    "p": ("pt-br", "pt", "pt-BR"),
+    "e": ("es", "es", "es"),
+    "f": ("fr-fr", "fr", "fr"),
+    "i": ("it", "it", "it"),
+    "j": ("ja", "ja", "ja"),
+    "z": ("cmn", "zh", "zh"),
+    "h": ("hi", "hi", "hi"),
 }
-GENDERS = {"f": "feminina", "m": "masculina"}
 # Idiomas que precisam do misaki para gerar fonemas: prefixo -> (submódulo, classe).
 MISAKI = {"z": ("zh", "ZHG2P"), "j": ("ja", "JAG2P")}
 # Voz padrão: a de melhor avaliação no VOICES.md do Kokoro.
@@ -147,10 +147,10 @@ class KokoroEngine(TTSEngine):
             if len(prefix) != 2 or prefix[0] not in LANGUAGES or prefix[0] in skip:
                 continue
             espeak, iso, group = LANGUAGES[prefix[0]]
-            gender = GENDERS.get(prefix[1], "")
-            label = short.replace("_", " ").title() + (f" ({gender})" if gender else "")
+            gender = prefix[1] if prefix[1] in ("f", "m") else ""
+            label = short.replace("_", " ").title()
             voices.append(
-                Voice(name, label, languages=(iso,), group=group, params={
+                Voice(name, label, languages=(iso,), group=group, gender=gender, params={
                     "voice": name, "lang": espeak, "g2p": "misaki" if prefix[0] in MISAKI else "espeak",
                 })
             )
