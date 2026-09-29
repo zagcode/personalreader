@@ -27,6 +27,9 @@ const store = {
   set(key, value) {
     try { localStorage.setItem("pr:" + key, JSON.stringify(value)); } catch { /* sem storage */ }
   },
+  remove(key) {
+    try { localStorage.removeItem("pr:" + key); } catch { /* sem storage */ }
+  },
 };
 
 const settings = {
@@ -93,14 +96,14 @@ async function loadLibrary() {
       meta.textContent = errorText(doc.error);
       meta.classList.add("bad");
     } else {
-      const pos = store.get("pos:" + doc.id, 0);
-      const pct = doc.segments ? Math.round((pos / doc.segments) * 100) : 0;
+      const heard = heardFraction(doc);
+      const pct = heard >= 0.995 ? 100 : Math.floor(heard * 100);
       const size = doc.duration ? `~${fmtDuration(doc.duration)}` : t("library.sentences", { n: doc.segments });
-      meta.textContent = pos ? t("library.heard", { size, pct }) : size;
+      meta.textContent = heard > 0 ? t("library.heard", { size, pct }) : size;
       const meter = document.createElement("span");
       meter.className = "meter";
       meter.innerHTML = `<span style="width:${pct}%"></span>`;
-      if (pos) a.append(meter);
+      if (heard > 0) a.append(meter);
     }
 
     const remove = document.createElement("button");
@@ -111,6 +114,8 @@ async function loadLibrary() {
     remove.addEventListener("click", async () => {
       if (!confirm(t("library.deleteConfirm", { name: doc.name }))) return;
       await api(`/api/documents/${doc.id}`, { method: "DELETE" }).catch(() => {});
+      store.remove("pos:" + doc.id);
+      store.remove("heard:" + doc.id);
       loadLibrary();
     });
 
@@ -119,6 +124,22 @@ async function loadLibrary() {
   }
 
   if (docs.some((d) => d.status === "processing")) libTimer = setTimeout(loadLibrary, 1500);
+}
+
+/* Fração do texto já ouvida (0 a 1), pelo tempo: até o fim da frase mais adiante que tocou até o fim.
+   Documentos de versões anteriores só têm a posição do player; ela serve de estimativa. */
+function heardFraction(doc) {
+  const heard = store.get("heard:" + doc.id, null);
+  if (heard !== null) return heard;
+  const pos = store.get("pos:" + doc.id, 0);
+  return doc.segments ? pos / doc.segments : 0;
+}
+
+function saveHeard(i) {
+  const total = R.startAt[R.total];
+  if (!total) return;
+  const frac = Math.min(1, R.startAt[i + 1] / total);
+  if (frac > store.get("heard:" + R.id, 0)) store.set("heard:" + R.id, frac);
 }
 
 /* Só PDFs têm progresso por página; os outros formatos convertem em segundos. */
@@ -503,8 +524,10 @@ audio.addEventListener("ended", () => {
     return;
   }
   markHeard(R.index);
+  saveHeard(R.index);
   if (R.index >= R.total - 1) {
     stopPlayback();
+    store.set("pos:" + R.id, 0);
     setPlayState(t("player.end"));
     updatePlayer();
     return;
