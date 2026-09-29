@@ -44,13 +44,19 @@ def cache_key(engine: TTSEngine, voice: Voice, text: str) -> str:
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:24]
 
 
-def audio_path(key: str) -> Path:
-    return config.AUDIO_DIR / key[:2] / f"{key}.{AUDIO_EXT}"
+def audio_path(doc_id: str, key: str) -> Path:
+    """O áudio fica dentro da pasta do documento: apagar o documento apaga o áudio junto."""
+    return config.DOCS_DIR / doc_id / "audio" / f"{key}.{AUDIO_EXT}"
+
+
+class DocumentGone(Exception):
+    """O documento foi apagado enquanto a frase era gerada."""
 
 
 @dataclass
 class Job:
-    key: str
+    key: str  # id da tarefa: "doc/chave"
+    audio_key: str
     text: str
     voice: Voice
     doc_id: str
@@ -77,16 +83,19 @@ class TTSQueue:
         self._thread.start()
 
     def submit(self, text: str, voice: Voice, doc_id: str, priority: int) -> tuple[str, Future]:
-        key = cache_key(self.engine, voice, text)
-        if audio_path(key).exists():
+        """Enfileira uma frase. Devolve o id da tarefa ("doc/chave") e o Future com o caminho do áudio."""
+        audio_key = cache_key(self.engine, voice, text)
+        key = f"{doc_id}/{audio_key}"
+        path = audio_path(doc_id, audio_key)
+        if path.exists():
             done: Future = Future()
-            done.set_result(audio_path(key))
+            done.set_result(path)
             return key, done
 
         with self._cond:
             job = self._jobs.get(key)
             if job is None:
-                job = Job(key, text, voice, doc_id, priority)
+                job = Job(key, audio_key, text, voice, doc_id, priority)
                 self._jobs[key] = job
                 heapq.heappush(self._heap, (priority, next(self._seq), key))
                 self._cond.notify()
@@ -148,12 +157,16 @@ class TTSQueue:
                 started = time.perf_counter()
                 wav, sr = self.engine.synthesize(job.text, job.voice)
                 elapsed = time.perf_counter() - started
-                path = self._write(job.key, wav, sr)
+                path = self._write(job.doc_id, job.audio_key, wav, sr)
                 duration = max(len(wav) / sr, 0.1)
                 rtf = elapsed / duration
                 self.rtf = rtf if self.rtf is None else 0.7 * self.rtf + 0.3 * rtf
                 log.info("frase sintetizada: %.1fs de áudio em %.1fs (%d chars)", duration, elapsed, len(job.text))
                 job.future.set_result(path)
+            except DocumentGone as exc:
+                log.info("frase descartada: documento %s apagado durante a síntese", job.doc_id)
+                if not job.future.cancelled():
+                    job.future.set_exception(exc)
             except Exception as exc:  # noqa: BLE001 - devolvido ao cliente
                 log.exception("falha na síntese")
                 if not job.future.cancelled():
@@ -163,16 +176,22 @@ class TTSQueue:
                     self._jobs.pop(job.key, None)
 
     @staticmethod
-    def _write(key: str, wav: np.ndarray, sr: int) -> Path:
-        path = audio_path(key)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        wav = np.clip(wav, -1.0, 1.0)
-        if AUDIO_EXT == "mp3":
-            sf.write(tmp, wav, sr, format="MP3")
-        else:
-            sf.write(tmp, wav, sr, format="WAV", subtype="PCM_16")
-        tmp.replace(path)
+    def _write(doc_id: str, audio_key: str, wav: np.ndarray, sr: int) -> Path:
+        path = audio_path(doc_id, audio_key)
+        try:
+            # parents=False: se a pasta do documento sumiu, não recria uma pasta órfã.
+            path.parent.mkdir(exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            wav = np.clip(wav, -1.0, 1.0)
+            if AUDIO_EXT == "mp3":
+                sf.write(tmp, wav, sr, format="MP3")
+            else:
+                sf.write(tmp, wav, sr, format="WAV", subtype="PCM_16")
+            tmp.replace(path)
+        except (FileNotFoundError, sf.LibsndfileError) as exc:
+            if not (config.DOCS_DIR / doc_id).is_dir():
+                raise DocumentGone(doc_id) from exc
+            raise
         return path
 
 

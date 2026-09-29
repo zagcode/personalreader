@@ -11,7 +11,8 @@ def _bool(name: str, default: bool) -> bool:
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
 DOCS_DIR = DATA_DIR / "docs"
-AUDIO_DIR = DATA_DIR / "audio"
+# Cache de áudio de versões antigas, compartilhado entre documentos; removido ao iniciar.
+LEGACY_AUDIO_DIR = DATA_DIR / "audio"
 STATIC_DIR = BASE_DIR / "static"
 
 # Nome registrado em app/tts/engines/__init__.py ("kokoro", "mock") ou "pacote.modulo:Classe".
@@ -37,5 +38,5 @@ ALLOWED_EXTENSIONS = {
     ".epub", ".odt", ".png", ".jpg", ".jpeg", ".tiff", ".tif",
 }
 
-for d in (DOCS_DIR, AUDIO_DIR):
+for d in (DOCS_DIR,):
     d.mkdir(parents=True, exist_ok=True)

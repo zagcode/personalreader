@@ -3,6 +3,7 @@ import base64
 import hmac
 import logging
 import secrets
+import shutil
 from concurrent.futures import CancelledError, ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,7 +16,7 @@ from pydantic import BaseModel
 from . import config, converter, storage
 from .segmenter import segment_markdown
 from .tts.engines import create_engine
-from .tts.queue import AUDIO_MIME, PRIORITY_AHEAD, PRIORITY_NOW, TTSQueue
+from .tts.queue import AUDIO_MIME, PRIORITY_AHEAD, PRIORITY_NOW, DocumentGone, TTSQueue
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("personalreader")
@@ -31,6 +32,10 @@ async def lifespan(_: FastAPI):
         if meta["status"] == "processing":
             meta.update(status="error", error="Conversão interrompida (o servidor reiniciou). Envie o arquivo de novo.")
             storage.save_meta(meta)
+    if config.LEGACY_AUDIO_DIR.is_dir():
+        # Antes o áudio ficava numa pasta comum e não era apagado junto com o documento.
+        shutil.rmtree(config.LEGACY_AUDIO_DIR, ignore_errors=True)
+        log.info("cache de áudio antigo removido: %s", config.LEGACY_AUDIO_DIR)
     tts.start()
     yield
     convert_pool.shutdown(wait=False, cancel_futures=True)
@@ -188,6 +193,8 @@ async def segment_audio(doc_id: str, index: int, voice: str = ""):
         path = await asyncio.wrap_future(future)
     except (CancelledError, asyncio.CancelledError):
         return JSONResponse({"detail": "Síntese cancelada."}, status_code=409)
+    except DocumentGone as exc:
+        raise HTTPException(404, "Documento não encontrado.") from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(500, f"Falha ao gerar o áudio: {exc}") from exc
     return FileResponse(path, media_type=AUDIO_MIME, headers={"Cache-Control": "private, max-age=86400"})

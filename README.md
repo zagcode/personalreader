@@ -9,7 +9,7 @@ Foi pensado para uma VPS sem GPU. O áudio não é gerado de uma vez: o servidor
 1. O upload grava o arquivo em `data/app/docs/<id>/` e entra numa fila de conversão, que processa um documento por vez. PDFs são convertidos em blocos de 4 páginas (`DOCLING_PAGES_PER_STEP`), e a página mostra a porcentagem a cada bloco. No teste local, converter em blocos levou o mesmo tempo que converter tudo de uma vez. Quando um parágrafo atravessa a divisa entre dois blocos, as duas metades são juntadas de novo. Os outros formatos não têm páginas no docling e mostram só "Convertendo o arquivo…", mas costumam ficar prontos em segundos.
 2. O docling gera Markdown. `app/segmenter.py` separa o Markdown em blocos (títulos, parágrafos, listas, citações e tabelas) e os blocos em frases. Frases muito curtas são juntadas à seguinte e as muito longas são quebradas em vírgula ou ponto e vírgula. Tabelas aparecem na tela, mas não são lidas, e blocos de código são ignorados.
 3. O player pede o áudio de uma frase por vez. `app/tts/queue.py` tem um único worker: em CPU, duas sínteses em paralelo só dividem os núcleos. A frase que o player está esperando passa na frente das frases de pré-carga.
-4. O áudio gerado fica em cache no disco (MP3), indexado pelo modelo, pela voz e pelo texto. Ouvir de novo, voltar a um trecho ou reabrir o documento não gera nada outra vez.
+4. O áudio gerado fica em cache no disco (MP3), dentro da pasta do documento (`docs/<id>/audio/`), indexado pelo modelo, pela voz e pelo texto. Ouvir de novo, voltar a um trecho ou reabrir o documento não gera nada outra vez, e apagar o documento apaga o áudio dele junto.
 
 ## Na tela de leitura
 
